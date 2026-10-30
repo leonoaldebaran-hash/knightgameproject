@@ -21,7 +21,6 @@ typedef struct Player {
     PlayerState state;
     int attackStep;     // golpe atual do combo (0, 1 ou 2)
     float attackTimer;  // tempo desde o início do golpe
-    bool comboQueued;   // o jogador já apertou o próximo golpe
     int attackId;       // muda a cada golpe, para cada golpe acertar um alvo só uma vez
 } Player;
 

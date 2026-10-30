@@ -6,9 +6,9 @@
 #define DECEL      40.0f   // freio ao soltar o direcional
 #define TURN_SPEED 12.0f   // rapidez para virar na direção do movimento
 
-#define ATTACK_TIME   0.32f   // duração de cada golpe (segundos)
+#define ATTACK_TIME   0.22f   // duração de cada golpe (segundos)
 #define ATTACK_LUNGE  3.0f    // passo à frente no início do golpe
-#define COMBO_WINDOW  0.3f    // a partir de que ponto do golpe dá para emendar o próximo
+#define CANCEL_POINT  0.35f   // a partir de que ponto do golpe (0 a 1) um novo aperto já corta para o próximo
 #define SHIELD_TURN   10.0f   // rapidez para virar com o escudo levantado
 
 typedef struct AttackInfo {
@@ -20,9 +20,9 @@ typedef struct AttackInfo {
 
 // Combo de 3 golpes: corte para a esquerda, corte de volta, estocada
 static const AttackInfo attacks[3] = {
-    { 1.7f, 70.0f*DEG2RAD, 0.25f, 0.65f },
-    { 1.7f, 70.0f*DEG2RAD, 0.25f, 0.65f },
-    { 2.0f, 25.0f*DEG2RAD, 0.30f, 0.70f },
+    { 1.7f, 70.0f*DEG2RAD, 0.10f, 0.65f },
+    { 1.7f, 70.0f*DEG2RAD, 0.10f, 0.65f },
+    { 2.0f, 25.0f*DEG2RAD, 0.15f, 0.70f },
 };
 
 void Player_Init(Player *p)
@@ -55,7 +55,6 @@ static void StartAttack(Player *p, int step, Vector3 wishDir)
     p->state = PSTATE_ATTACK;
     p->attackStep = step;
     p->attackTimer = 0.0f;
-    p->comboQueued = false;
     p->attackId++;
 }
 
@@ -70,13 +69,27 @@ static void UpdateNormal(Player *p, Vector3 wishDir, float dt)
     if (Vector3Length(p->vel) > 0.1f) TurnTowards(p, atan2f(p->vel.x, p->vel.z), TURN_SPEED, dt);
 }
 
-static void UpdateAttack(Player *p, bool attackPressed, float dt)
+static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool shieldHeld, float dt)
 {
     const AttackInfo *a = &attacks[p->attackStep];
-    p->attackTimer += dt;
     float t = p->attackTimer/ATTACK_TIME;
 
-    if (attackPressed && t > COMBO_WINDOW && p->attackStep < 2) p->comboQueued = true;
+    // Resposta imediata: um novo aperto corta o golpe atual e já começa o próximo do combo
+    if (attackPressed && t > CANCEL_POINT)
+    {
+        StartAttack(p, (p->attackStep + 1)%3, wishDir);
+        return;
+    }
+
+    // O escudo também interrompe o golpe na hora
+    if (shieldHeld && t > CANCEL_POINT)
+    {
+        p->state = PSTATE_SHIELD;
+        return;
+    }
+
+    p->attackTimer += dt;
+    t = p->attackTimer/ATTACK_TIME;
 
     // Pequeno avanço no começo do golpe, depois para firme
     Vector3 facing = { sinf(p->angle), 0.0f, cosf(p->angle) };
@@ -85,11 +98,7 @@ static void UpdateAttack(Player *p, bool attackPressed, float dt)
 
     if (t >= a->hitStart && t <= a->hitEnd) Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
 
-    if (t >= 1.0f)
-    {
-        if (p->comboQueued) StartAttack(p, p->attackStep + 1, Vector3Zero());
-        else p->state = PSTATE_NORMAL;
-    }
+    if (t >= 1.0f) p->state = PSTATE_NORMAL;
 }
 
 static void UpdateShield(Player *p, Vector3 wishDir, float dt)
@@ -114,7 +123,7 @@ void Player_Update(Player *p, float camYaw, float dt)
             break;
 
         case PSTATE_ATTACK:
-            UpdateAttack(p, attackPressed, dt);
+            UpdateAttack(p, wishDir, attackPressed, shieldHeld, dt);
             break;
 
         case PSTATE_SHIELD:
