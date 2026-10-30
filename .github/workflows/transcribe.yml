@@ -1,0 +1,48 @@
+name: Transcrever músicas
+
+on:
+  push:
+    branches: [main]
+    paths: ['tools/transcribe.py', '.github/workflows/transcribe.yml']
+  workflow_dispatch:
+    inputs:
+      tracks:
+        description: 'Faixas (nomes em assets/music_src, separados por espaço)'
+        default: 'after_future'
+
+permissions:
+  contents: write
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar ferramentas
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install torch==2.1.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
+          pip install demucs==4.0.1 basic-pitch==0.3.0 librosa==0.10.2.post1 "numpy<2" soundfile
+
+      - name: Transcrever
+        run: |
+          mkdir -p docs/transcricao
+          python tools/transcribe.py ${{ github.event.inputs.tracks || 'after_future' }} 2>&1 | tee docs/transcricao/log.txt
+
+      - name: Salvar o resultado no repositório
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tail -n 80 docs/transcricao/log.txt > docs/transcricao/log_tail.txt || true
+          rm -f docs/transcricao/log.txt
+          git add docs/transcricao assets/midi_src || true
+          git diff --cached --quiet || git commit -m "Update music transcription"
+          git pull --rebase
+          git push
