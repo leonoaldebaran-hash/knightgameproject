@@ -17,6 +17,7 @@ static void UpdateDrawFrame(void)
     if (dt > 0.1f) dt = 0.1f;   // evita "teleportes" quando a aba fica em segundo plano
 
     Player_Update(&player, gameCamera.yaw, dt);
+    Dummies_Update(dt);
     GameCamera_Update(&gameCamera, &player, dt);
 
     BeginDrawing();
@@ -24,11 +25,14 @@ static void UpdateDrawFrame(void)
 
     BeginMode3D(gameCamera.cam);
         World_Draw();
+        Dummies_Draw();
         Player_Draw(&player);
     EndMode3D();
 
-    DrawText("Knight Game Project - Tarefa 3", 10, 10, 20, RAYWHITE);
+    DrawText("Knight Game Project - Tarefa 4", 10, 10, 20, RAYWHITE);
     DrawText("Andar: setas/WASD ou analogico | Camera: Q/E ou analogico direito | Centralizar: C ou L1", 10, 34, 10, RAYWHITE);
+    DrawText("Espada: J ou B (aperte 3x para o combo) | Escudo: segure K ou R1", 10, 48, 10, RAYWHITE);
+    DrawText(TextFormat("Acertos: %d", Dummies_TotalHits()), SCREEN_W - 110, 10, 20, RAYWHITE);
     DrawFPS(10, SCREEN_H - 30);
     DrawText("versao " GAME_VERSION, SCREEN_W - 110, SCREEN_H - 20, 10, RAYWHITE);
     EndDrawing();
@@ -39,6 +43,7 @@ int main(void)
     InitWindow(SCREEN_W, SCREEN_H, "Knight Game Project");
 
     World_Init();
+    Dummies_Init();
     Player_Init(&player);
     GameCamera_Init(&gameCamera);
 

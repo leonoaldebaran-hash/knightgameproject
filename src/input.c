@@ -36,6 +36,18 @@ float Input_Orbit(void)
     return Clamp(orbit, -1.0f, 1.0f);
 }
 
+// Golpe de espada: J ou botão B (direita dos botões de ação)
+bool Input_Attack(void)
+{
+    return IsKeyPressed(KEY_J) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT));
+}
+
+// Escudo (segurar): K ou R1
+bool Input_Shield(void)
+{
+    return IsKeyDown(KEY_K) || (IsGamepadAvailable(0) && IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1));
+}
+
 // Centralizar a câmera atrás do jogador: C ou L1
 bool Input_Recenter(void)
 {

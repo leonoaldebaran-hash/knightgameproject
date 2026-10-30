@@ -7,11 +7,22 @@
 #define SCREEN_W 640
 #define SCREEN_H 480
 
+typedef enum PlayerState {
+    PSTATE_NORMAL,   // andando livre
+    PSTATE_ATTACK,   // golpe de espada em andamento
+    PSTATE_SHIELD,   // escudo levantado
+} PlayerState;
+
 typedef struct Player {
     Vector3 pos;
     Vector3 vel;
-    float angle;    // direção para onde o jogador olha (radianos)
-    float radius;   // raio usado na colisão
+    float angle;        // direção para onde o jogador olha (radianos)
+    float radius;       // raio usado na colisão
+    PlayerState state;
+    int attackStep;     // golpe atual do combo (0, 1 ou 2)
+    float attackTimer;  // tempo desde o início do golpe
+    bool comboQueued;   // o jogador já apertou o próximo golpe
+    int attackId;       // muda a cada golpe, para cada golpe acertar um alvo só uma vez
 } Player;
 
 typedef struct GameCamera {
@@ -32,6 +43,8 @@ static inline float WrapAngle(float a)
 Vector2 Input_Move(void);
 float Input_Orbit(void);
 bool Input_Recenter(void);
+bool Input_Attack(void);
+bool Input_Shield(void);
 
 // Mundo (world.c)
 void World_Init(void);
@@ -42,6 +55,14 @@ void World_Draw(void);
 void Player_Init(Player *p);
 void Player_Update(Player *p, float camYaw, float dt);
 void Player_Draw(const Player *p);
+
+// Bonecos de treino (dummy.c)
+void Dummies_Init(void);
+void Dummies_Update(float dt);
+int Dummies_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId);
+Vector3 Dummies_Collide(Vector3 pos, float radius);
+void Dummies_Draw(void);
+int Dummies_TotalHits(void);
 
 // Câmera (camera.c)
 void GameCamera_Init(GameCamera *c);
