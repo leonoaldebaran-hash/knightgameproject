@@ -38,7 +38,7 @@ jobs:
       - name: Compilar o jogo
         run: |
           mkdir -p public
-          emcc src/main.c build/libraylib.a -o public/index.html -Os -Wall \
+          emcc src/*.c build/libraylib.a -o public/index.html -Os -Wall \
             -Iraylib/src -DPLATFORM_WEB -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1
 
       - uses: actions/upload-pages-artifact@v3
