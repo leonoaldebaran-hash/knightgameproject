@@ -142,7 +142,7 @@ Elementos de puzzle recorrentes: blocos para empurrar e puxar, interruptores de 
 | Terra | Blocos gigantes, pilares para esmagar com o martelo, plataformas que afundam |
 | Ar | Correntes de vento, pontes suspensas, alvos distantes para o arco |
 | Fogo | Lava que sobe e desce, muros rachados para bombas, tochas com tempo |
-| Água | Três níveis de água controlados por torres; mergulho com a máscara |
+| Água | Labirinto de cachoeiras e tobogãs de água: escolher a correnteza certa leva a salas diferentes; desviar fluxos com comportas; mergulho com a máscara para alcançar túneis no fundo das quedas |
 | Sombras | Paredes invisíveis e salas de ilusão, alvos de gancho no escuro |
 | Luz | Espelhos e feixes de luz, lanças explosivas em cristais; puzzles em dupla com Aurel |
 | Caos | Gravidade e salas que giram; botas de ferro para andar onde tudo desmorona |
