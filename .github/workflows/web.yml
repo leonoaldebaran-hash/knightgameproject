@@ -38,8 +38,13 @@ jobs:
       - name: Compilar o jogo
         run: |
           mkdir -p public
+          VERSION=$(echo "$GITHUB_SHA" | cut -c1-7)
           emcc src/*.c build/libraylib.a -o public/index.html -Os -Wall \
-            -Iraylib/src -DPLATFORM_WEB -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1
+            -Iraylib/src -DPLATFORM_WEB -DGAME_VERSION="\"$VERSION\"" \
+            -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1 -s SINGLE_FILE=1
+          # Nome novo a cada build para o navegador nunca usar uma versão antiga do cache
+          mv public/index.js public/game-$VERSION.js
+          sed -i "s/index\.js/game-$VERSION.js/" public/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:

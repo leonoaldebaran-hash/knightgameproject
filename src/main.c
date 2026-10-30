@@ -3,6 +3,11 @@
 #include <emscripten/emscripten.h>
 #endif
 
+// Versão do build (o GitHub Actions preenche com o código do commit)
+#ifndef GAME_VERSION
+#define GAME_VERSION "dev"
+#endif
+
 static Player player;
 static GameCamera gameCamera;
 
@@ -25,6 +30,7 @@ static void UpdateDrawFrame(void)
     DrawText("Knight Game Project - Tarefa 3", 10, 10, 20, RAYWHITE);
     DrawText("Andar: setas/WASD ou analogico | Camera: Q/E ou analogico direito | Centralizar: C ou L1", 10, 34, 10, RAYWHITE);
     DrawFPS(10, SCREEN_H - 30);
+    DrawText("versao " GAME_VERSION, SCREEN_W - 110, SCREEN_H - 20, 10, RAYWHITE);
     EndDrawing();
 }
 
