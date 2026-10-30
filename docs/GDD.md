@@ -1,0 +1,138 @@
+# Knight Game Project — Game Design Document (GDD)
+
+> Documento vivo. Nomes e detalhes marcados como *(provisório)* podem mudar.
+
+## 1. Visão geral
+
+| Item | Definição |
+|---|---|
+| Gênero | Ação-aventura 3D em terceira pessoa, com dungeons e quebra-cabeças |
+| Inspirações | Zelda: Ocarina of Time e Twilight Princess (estrutura e estética), Cavaleiros do Zodíaco (armaduras — apenas inspiração, designs originais), mitologia grega |
+| Plataforma alvo | R36S (ArkOS/dArkOS, ARM64, Mali-G31, 1 GB RAM, tela 640×480) — port nativo |
+| Plataforma de testes | Navegador (build WebAssembly no GitHub Pages) |
+| Tecnologia | C + raylib (mesmo código para Web e R36S), build via GitHub Actions |
+| Estética | Medieval, low-poly estilo N64/OoT, paleta e clima de Twilight Princess |
+| Assets | Gerados com auxílio de IA (conceitos, texturas, modelos, música), otimizados para o R36S |
+
+### Orçamento técnico (R36S)
+- 30 fps a 640×480
+- ~10–20 mil triângulos visíveis por cena
+- Texturas 64×64 a 128×128
+- Inimigos simultâneos na tela: até ~4–6
+
+## 2. Pilares de jogo
+1. **Combate de espada e escudo** com mira travada (Z-target), contra inimigos humanos de armadura.
+2. **Dungeons com item obrigatório**: cada templo concede um item necessário para resolvê-lo e para avançar no mundo.
+3. **A armadura suprema**: cada templo concede uma peça; completa, ela é usada no castelo final.
+4. **Mistério revelado aos poucos**: lendas do vilarejo que se mostram fatos reais (estilo Horizon Zero Dawn).
+
+## 3. Personagens
+
+### Mateo — protagonista
+- Loiro, olhos azuis, adulto, cavaleiro de espada e escudo.
+- Nome: **魔 "ma"** (japonês, demônio) + **"theós"** (grego, deus). A dualidade demônio/deus é o tema central do personagem.
+- Apaixonado por Johana sem perceber; descobre isso ao longo da jornada.
+- No clímax, passa por uma transformação de raça: cabelo e olhos prateados, cabelo longo.
+
+### Johana — a melhor amiga
+- Cresceu com Mateo em Black Waters Village.
+- É a reencarnação de **Reia**, esposa de Cronos.
+- No dia da Grande Vazante entra em transe (olhos sem pupila) e sobe aos céus, recebida por Kairós.
+
+### Kairós, o Cavaleiro de Prata — antagonista misterioso
+- Cabelo prateado e longo, armadura negra e prateada.
+- Arauto de Cronos. Na mitologia, Kairós é o "tempo oportuno", oposto de Cronos, o "tempo que devora".
+- **Verdade:** é o Mateo do ciclo anterior, que falhou e foi corrompido (o lado *Ma*).
+
+### Aurel, o Peregrino — aliado misterioso
+- Cavaleiro andarilho, sarcástico, que sempre parece saber demais.
+- **Verdade:** é **Hipérion**, titã da luz, irmão de Reia. Foi mentor do primeiro Mateo e tentou esconder Reia de Cronos no ciclo anterior.
+- Acompanha Mateo no Templo da Luz, onde se revela e morre.
+
+### Cronos — inimigo final
+- Titã do tempo. Voltou de outra dimensão, onde criava um novo universo (o nosso mundo real).
+- Quer reiniciar o mundo usando o poder de Reia, ao custo de toda a humanidade e da vida de Johana.
+
+### Vó Copélia — anciã do vilarejo
+- Guarda e conta as lendas de Black Waters. Sabe mais do que diz.
+- O nome é anagrama de **Calíope**, a musa da poesia épica (C-A-L-I-O-P-E → C-O-P-E-L-I-A).
+
+### Claude — o ferreiro
+- Amigo de infância e rival de Mateo.
+- Forja as melhorias de equipamento ao longo do jogo.
+
+### Outros *(provisório)*
+- **Astra:** a égua de Mateo.
+- **Nyx:** mercadora misteriosa que aparece em todos os biomas (loja do jogo).
+
+## 4. Mundo
+
+### Pangea
+Única terra acima d'água que a humanidade conhece. Todos acreditam que é o mundo inteiro.
+
+### Black Waters Village
+Vilarejo natal de Mateo e Johana. Tem águas cristalinas, mas o nome vem de uma origem que ninguém lembra: surgiu logo após o apocalipse aquático.
+
+### Gaia
+O mundo antigo, submerso, revelado quando as águas baixam. Contém os biomas e os templos.
+
+## 5. História
+
+### A verdade (revelada aos poucos)
+1. **O ciclo anterior:** milhões de anos atrás já existiram um Mateo e uma Johana. Cronos tentou reiniciar o mundo usando Reia; Mateo tentou impedir, falhou, e Johana morreu. Cronos ofereceu um pacto: "Sirva-me e um dia a terá de volta." Mateo aceitou e foi corrompido, tornando-se Kairós.
+2. **A armadura dividida:** antes de ser corrompido, o primeiro Mateo dividiu sua armadura suprema em 8 templos, como última esperança para o próximo ciclo.
+3. **O apocalipse aquático foi um reinício pela metade:** Cronos começou a inundar o mundo para reiniciá-lo, mas partiu no meio do processo para criar outro universo (o nosso). O planeta ficou afogado; só Pangea sobreviveu e Gaia ficou submersa.
+4. **O retorno:** Cronos volta, encontra o mundo arruinado e decide terminar o reinício. As águas baixam, Gaia reaparece e Johana desperta como Reia. Ela dará à luz os deuses essenciais para refazer o mundo e morrerá com sua energia esgotada.
+
+### Lendas do vilarejo × verdade
+| Lenda | Verdade |
+|---|---|
+| "O Cavaleiro de Prata que chorou o mar" | Kairós inundou o mundo (e no clímax chora de verdade) |
+| "A Mãe que dorme sob as águas" | Reia e Gaia submersa |
+| "O Devorador que foi construir outro céu" | Cronos criando o nosso universo |
+| "As oito chamas que guardam a armadura do primeiro herói" | Os templos e as peças da armadura |
+
+### Estrutura em atos
+**Prólogo** — Vida em Black Waters com Johana, Vó Copélia e Claude. Tutorial de combate.
+
+**A Grande Vazante** — Evento sobrenatural: as águas baixam e Gaia é revelada. Johana entra em transe e sobe aos céus até os braços de Kairós. Mateo parte em jornada.
+
+**A jornada** — 8 templos (ver seção 6).
+
+**O Castelo Imperial** — O castelo afunda até o núcleo da Terra enquanto Reia começa a dar à luz os deuses.
+1. **Batalha a cavalo contra Kairós:** Mateo em Astra contra Kairós em seu cavalo negro de prata. Mateo vence mas não o mata. Kairós recupera a memória e chora (a lenda se fecha). Ele se funde a Mateo: o *Ma* aceita o *Teo*.
+2. **Transformação:** Mateo ganha cabelo e olhos prateados e longos — o que Kairós deveria ter sido.
+3. **Batalha aérea contra Cronos:** com as asas da armadura completa, no espaço-tempo distorcido do núcleo.
+4. **Desfecho:** Cronos é selado. Johana desperta, mas o poder dela e o de Mateo agora sustentam o mundo.
+
+**Epílogo** — Mateo e Johana tornam-se constelações e entidades guardiãs de Gaia; não poderão viver no mundo que salvaram. Milênios depois, crianças de um vilarejo ouvem uma nova lenda: "O Cavaleiro de Prata que secou o mar." O ciclo se fecha, agora do lado bom.
+
+## 6. Templos
+
+| Nº | Templo | Bioma em Gaia | Item obrigatório | Peça da armadura | Momento da história |
+|---|---|---|---|---|---|
+| 1 | Terra | Cânions e ruínas | Martelo | Botas | Primeira descida a Gaia; conhece Aurel |
+| 2 | Ar | Picos e pontes suspensas | Arco e flecha | Perneiras | Primeira aparição de Kairós, que humilha Mateo |
+| 3 | Fogo | Vulcão | Bombas | Cinturão | Mural mostra "um herói loiro" do passado |
+| 4 | Água | Cidade submersa | Máscara d'água (fôlego profundo) | Braceletes | Descoberta do apocalipse e da cidade antiga |
+| 5 | Sombras | Floresta morta | Gancho | Ombreiras | Visões de Johana; Mateo entende o que sente |
+| 6 | Luz | Deserto de cristal | Lançador de lanças explosivas | Peitoral | Aurel luta junto, revela-se Hipérion e morre |
+| 7 | Caos | Ilhas flutuantes partidas | Botas de ferro | Elmo | Kairós tira o elmo: tem o rosto de Mateo |
+| 8 | Ordem | Cidade geométrica perfeita | Asas/manto de planar | Asas | Diário do primeiro Mateo; Mateo entende a escolha dele |
+| — | Castelo Imperial | Núcleo da Terra | Armadura completa | — | Kairós, transformação, Cronos |
+
+Chefes: os **8 Guardiões Titânicos**, cavaleiros de Cronos com armaduras temáticas de constelação e elemento (designs originais).
+
+## 7. Inimigos
+- Somente humanos de armadura (soldados, arqueiros, cavaleiros pesados, guardiões).
+- Armaduras com design inspirado no estilo de Cavaleiros do Zodíaco, sem copiar designs existentes.
+
+## 8. Trilha sonora
+- Orquestra épica + coral + guitarra no estilo anos 80, no clima de Cavaleiros do Zodíaco e Ocarina of Time.
+- Composições originais (geradas com IA); não reproduzir melodias existentes.
+
+## 9. Pendências
+- [ ] Nomes dos 8 Guardiões Titânicos
+- [ ] Design visual de Mateo, Johana, Kairós e Aurel
+- [ ] Design de cada peça da armadura suprema
+- [ ] Mapa do overworld de Pangea e Gaia
