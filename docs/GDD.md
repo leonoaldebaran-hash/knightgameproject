@@ -254,6 +254,7 @@ Os valores serão ajustados comparando gravações frame a frame do Ship of Hark
 | Paganini Fist | Combate *(em uso)* |
 | Ember Heart (partes 1 a 3) | Templo do Fogo: exploração, mini-chefe e chefe |
 | Crimson Sky Requiem | Tema de Kairós e momentos sombrios |
+| Bubbles | Templo da Água (cachoeiras e tobogãs) |
 
 ## 11. Pendências
 - [ ] Nomes dos 8 Guardiões Titânicos
