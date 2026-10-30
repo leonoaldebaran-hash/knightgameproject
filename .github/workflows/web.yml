@@ -1,0 +1,56 @@
+name: Build Web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.64
+
+      - name: Baixar raylib
+        run: git clone --depth 1 --branch 5.5 https://github.com/raysan5/raylib.git raylib
+
+      - name: Compilar raylib para Web
+        run: |
+          mkdir -p build/raylib
+          for f in rcore rshapes rtextures rtext rmodels utils raudio; do
+            emcc -c raylib/src/$f.c -o build/raylib/$f.o -Os -DPLATFORM_WEB -DGRAPHICS_API_OPENGL_ES2
+          done
+          emar rcs build/libraylib.a build/raylib/*.o
+
+      - name: Compilar o jogo
+        run: |
+          mkdir -p public
+          emcc src/main.c build/libraylib.a -o public/index.html -Os -Wall \
+            -Iraylib/src -DPLATFORM_WEB -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
