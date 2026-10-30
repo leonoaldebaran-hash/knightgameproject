@@ -10,6 +10,15 @@
 #define ATTACK_LUNGE  3.0f    // passo à frente no início do golpe
 #define CANCEL_POINT  0.35f   // a partir de que ponto do golpe (0 a 1) um novo aperto já corta para o próximo
 #define SHIELD_TURN   10.0f   // rapidez para virar com o escudo levantado
+#define SHIELD_ARC    (75.0f*DEG2RAD)   // golpes vindos até esse ângulo da frente são defendidos
+
+#define START_HP      6       // 3 corações
+#define HURT_TIME     0.35f   // tempo sem controle depois de levar um golpe
+#define HURT_PUSH     7.0f    // força do empurrão ao levar um golpe
+#define INVULN_TIME   1.0f    // tempo piscando sem levar dano
+#define BLOCK_PUSH    3.0f    // empurrão ao defender com o escudo
+
+static const Vector3 spawnPos = { 0.0f, 0.0f, 6.0f };
 
 typedef struct AttackInfo {
     float reach;      // alcance a partir do centro do jogador
@@ -28,9 +37,52 @@ static const AttackInfo attacks[3] = {
 void Player_Init(Player *p)
 {
     *p = (Player){ 0 };
-    p->pos = (Vector3){ 0.0f, 0.0f, 6.0f };
+    p->pos = spawnPos;
     p->angle = PI;   // começa olhando para os pilares
     p->radius = 0.35f;
+    p->hp = p->maxHp = START_HP;
+}
+
+HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
+{
+    if (p->invulnTimer > 0.0f || p->state == PSTATE_HURT) return HIT_IGNORED;
+
+    float dx = from.x - p->pos.x, dz = from.z - p->pos.z;
+    float toAttacker = atan2f(dx, dz);
+    Vector3 away = Vector3Normalize((Vector3){ -dx, 0.0f, -dz });
+
+    // Escudo levantado e virado para o atacante: defende
+    if (p->state == PSTATE_SHIELD && fabsf(WrapAngle(toAttacker - p->angle)) < SHIELD_ARC)
+    {
+        p->vel = Vector3Scale(away, BLOCK_PUSH);
+        p->blockFlash = 0.12f;
+        return HIT_BLOCKED;
+    }
+
+    p->hp -= damage;
+    p->state = PSTATE_HURT;
+    p->hurtTimer = 0.0f;
+    p->vel = Vector3Scale(away, HURT_PUSH);
+    p->invulnTimer = INVULN_TIME;
+    return HIT_TAKEN;
+}
+
+static void UpdateHurt(Player *p, float dt)
+{
+    p->hurtTimer += dt;
+    p->vel = Vector3MoveTowards(p->vel, Vector3Zero(), DECEL*0.5f*dt);
+    if (p->hurtTimer < HURT_TIME) return;
+
+    if (p->hp <= 0)
+    {
+        // Por enquanto, cair só leva de volta ao início com a vida cheia
+        p->pos = spawnPos;
+        p->vel = Vector3Zero();
+        p->angle = PI;
+        p->hp = p->maxHp;
+        p->fallenTimer = 2.5f;
+    }
+    p->state = PSTATE_NORMAL;
 }
 
 // Direção desejada no mundo a partir do direcional (relativo à câmera)
@@ -96,7 +148,11 @@ static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool sh
     if (t < 0.4f) p->vel = Vector3Scale(facing, ATTACK_LUNGE);
     else p->vel = Vector3MoveTowards(p->vel, Vector3Zero(), DECEL*dt);
 
-    if (t >= a->hitStart && t <= a->hitEnd) Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
+    if (t >= a->hitStart && t <= a->hitEnd)
+    {
+        Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
+        Soldiers_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
+    }
 
     if (t >= 1.0f) p->state = PSTATE_NORMAL;
 }
@@ -113,6 +169,10 @@ void Player_Update(Player *p, float camYaw, float dt)
     Vector3 wishDir = WishDirection(camYaw);
     bool attackPressed = Input_Attack();
     bool shieldHeld = Input_Shield();
+
+    if (p->invulnTimer > 0.0f) p->invulnTimer -= dt;
+    if (p->blockFlash > 0.0f) p->blockFlash -= dt;
+    if (p->fallenTimer > 0.0f) p->fallenTimer -= dt;
 
     switch (p->state)
     {
@@ -131,11 +191,16 @@ void Player_Update(Player *p, float camYaw, float dt)
             else if (!shieldHeld) p->state = PSTATE_NORMAL;
             else UpdateShield(p, wishDir, dt);
             break;
+
+        case PSTATE_HURT:
+            UpdateHurt(p, dt);
+            break;
     }
 
     p->pos = Vector3Add(p->pos, Vector3Scale(p->vel, dt));
     p->pos = World_Collide(p->pos, p->radius);
     p->pos = Dummies_Collide(p->pos, p->radius);
+    p->pos = Soldiers_Collide(p->pos, p->radius);
 }
 
 // Ângulo da espada (graus, em volta do ombro) durante o golpe. Positivo = lado esquerdo.
@@ -184,15 +249,21 @@ void Player_Draw(const Player *p)
     // Sombra redonda no chão, como no N64
     DrawCylinder((Vector3){ p->pos.x, 0.01f, p->pos.z }, 0.45f, 0.45f, 0.01f, 16, Fade(BLACK, 0.3f));
 
+    // Pisca enquanto está invulnerável depois de levar dano
+    if (p->invulnTimer > 0.0f && fmodf(p->invulnTimer, 0.12f) < 0.06f) return;
+
+    Color body = (p->state == PSTATE_HURT) ? (Color){ 200, 60, 60, 255 } : (Color){ 40, 70, 160, 255 };
+    Color shield = (p->blockFlash > 0.0f) ? YELLOW : LIGHTGRAY;
+
     rlPushMatrix();
         rlTranslatef(p->pos.x, p->pos.y, p->pos.z);
         rlRotatef(p->angle*RAD2DEG, 0.0f, 1.0f, 0.0f);
-        DrawCube((Vector3){ 0.0f, 0.6f, 0.0f }, 0.6f, 1.2f, 0.4f, (Color){ 40, 70, 160, 255 });   // corpo
+        DrawCube((Vector3){ 0.0f, 0.6f, 0.0f }, 0.6f, 1.2f, 0.4f, body);                         // corpo
         DrawSphere((Vector3){ 0.0f, 1.45f, 0.0f }, 0.3f, (Color){ 240, 200, 90, 255 });         // cabeça loira
 
         // Escudo: na frente quando levantado, no braço esquerdo no resto do tempo
-        if (p->state == PSTATE_SHIELD) DrawCube((Vector3){ 0.1f, 0.8f, 0.45f }, 0.6f, 0.7f, 0.1f, LIGHTGRAY);
-        else DrawCube((Vector3){ 0.4f, 0.7f, 0.1f }, 0.1f, 0.6f, 0.5f, LIGHTGRAY);
+        if (p->state == PSTATE_SHIELD) DrawCube((Vector3){ 0.1f, 0.8f, 0.45f }, 0.6f, 0.7f, 0.1f, shield);
+        else DrawCube((Vector3){ 0.4f, 0.7f, 0.1f }, 0.1f, 0.6f, 0.5f, shield);
 
         // Espada: animada durante o golpe, apontando para a frente no braço direito no resto do tempo
         if (p->state == PSTATE_ATTACK) DrawSwordSwing(p);

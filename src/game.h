@@ -11,6 +11,7 @@ typedef enum PlayerState {
     PSTATE_NORMAL,   // andando livre
     PSTATE_ATTACK,   // golpe de espada em andamento
     PSTATE_SHIELD,   // escudo levantado
+    PSTATE_HURT,     // empurrado para trás depois de levar um golpe
 } PlayerState;
 
 typedef struct Player {
@@ -22,6 +23,11 @@ typedef struct Player {
     int attackStep;     // golpe atual do combo (0, 1 ou 2)
     float attackTimer;  // tempo desde o início do golpe
     int attackId;       // muda a cada golpe, para cada golpe acertar um alvo só uma vez
+    int hp, maxHp;      // vida em meios corações (2 = 1 coração)
+    float hurtTimer;    // tempo no estado de dano
+    float invulnTimer;  // tempo restante sem poder levar dano (pisca)
+    float blockFlash;   // brilho no escudo depois de defender
+    float fallenTimer;  // tempo da mensagem "Voce caiu!"
 } Player;
 
 typedef struct GameCamera {
@@ -54,6 +60,15 @@ void World_Draw(void);
 void Player_Init(Player *p);
 void Player_Update(Player *p, float camYaw, float dt);
 void Player_Draw(const Player *p);
+typedef enum { HIT_IGNORED, HIT_BLOCKED, HIT_TAKEN } HitResult;
+HitResult Player_TakeHit(Player *p, Vector3 from, int damage);
+
+// Soldados inimigos (soldier.c)
+void Soldiers_Init(void);
+void Soldiers_Update(Player *p, float dt);
+int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId);
+Vector3 Soldiers_Collide(Vector3 pos, float radius);
+void Soldiers_Draw(void);
 
 // Bonecos de treino (dummy.c)
 void Dummies_Init(void);
