@@ -1,52 +1,91 @@
 #include "game.h"
+#include <string.h>
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
 #endif
 
-// Nome do banco de instrumentos (o build da web troca por um nome com versão)
-#ifndef SOUNDBANK_FILE
-#define SOUNDBANK_FILE "soundbank.bin"
-#endif
+// Trilha sonora: músicas do autor feitas no Suno (assets/music_src/*.mp3), convertidas no
+// build para OGG com o tratamento estilo N64. A música do campo cede lugar à de combate
+// quando um inimigo persegue o jogador, com troca suave entre as duas.
 
-#define BATTLE_HOLD  2.5f   // segundos que a camada de combate continua depois da luta
+#define MUSIC_VOLUME   0.7f
+#define FADE_SPEED     1.2f   // volume por segundo na troca de faixa
+#define BATTLE_HOLD    2.5f   // segundos que a música de combate continua depois da luta
 
+typedef enum { TRACK_FIELD, TRACK_BATTLE, TRACK_COUNT } TrackId;
+
+static const char *trackFiles[TRACK_COUNT] = {
+    "after_future.ogg",    // campo de Pangea
+    "paganini_fist.ogg",   // combate
+};
+
+static Music tracks[TRACK_COUNT];
+static bool loaded[TRACK_COUNT];
+static float volume[TRACK_COUNT];
+static TrackId current = TRACK_FIELD;
 static float battleHold = 0.0f;
-static unsigned char *bankData = NULL;   // fica na memória enquanto o jogo roda
+static bool muted = false;
 
-static void StartWithBank(const char *path)
+static void StartTrack(int i, const char *path)
 {
-    int size = 0;
-    bankData = LoadFileData(path, &size);
-    if (bankData && Synth_LoadBank(bankData, size)) Synth_Play(&SONG_FIELD);
-    else TraceLog(LOG_WARNING, "MUSIC: banco de instrumentos invalido: %s", path);
+    tracks[i] = LoadMusicStream(path);
+    if (!IsMusicValid(tracks[i])) return;
+    tracks[i].looping = true;
+    SetMusicVolume(tracks[i], 0.0f);
+    PlayMusicStream(tracks[i]);
+    loaded[i] = true;
 }
 
 #if defined(PLATFORM_WEB)
-// No navegador o banco é baixado depois que o jogo abre, para não atrasar o início
-static void OnBankDownloaded(const char *file) { StartWithBank(file); }
-static void OnBankFailed(const char *file) { TraceLog(LOG_WARNING, "MUSIC: falha ao baixar %s", file); }
+// No navegador as músicas são baixadas depois que o jogo abre, para não atrasar o início
+static void OnTrackDownloaded(const char *file)
+{
+    for (int i = 0; i < TRACK_COUNT; i++)
+        if (strstr(file, trackFiles[i])) StartTrack(i, file);
+}
+
+static void OnTrackFailed(const char *file)
+{
+    TraceLog(LOG_WARNING, "MUSIC: nao foi possivel baixar %s", file);
+}
 #endif
 
 void Music_Init(void)
 {
-    Synth_Init();
+    for (int i = 0; i < TRACK_COUNT; i++)
+    {
 #if defined(PLATFORM_WEB)
-    emscripten_async_wget(SOUNDBANK_FILE, "/" SOUNDBANK_FILE, OnBankDownloaded, OnBankFailed);
+        emscripten_async_wget(TextFormat("music/%s", trackFiles[i]), TextFormat("/%s", trackFiles[i]), OnTrackDownloaded, OnTrackFailed);
 #else
-    StartWithBank("assets/" SOUNDBANK_FILE);
+        StartTrack(i, TextFormat("assets/music/%s", trackFiles[i]));
 #endif
+    }
 }
 
 void Music_Update(bool inBattle, float dt)
 {
     // M ou Select liga e desliga a música
     if (IsKeyPressed(KEY_M) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_LEFT)))
-        Synth_ToggleMute();
+        muted = !muted;
 
-    // A mesma música ganha a camada de combate quando um inimigo persegue o jogador,
-    // e ela sai devagar um pouco depois da luta, como no Ocarina
+    // Segura a música de combate um pouco depois da luta, para não ficar trocando toda hora
     if (inBattle) battleHold = BATTLE_HOLD;
     else if (battleHold > 0.0f) battleHold -= dt;
 
-    Synth_SetIntensity((battleHold > 0.0f) ? 1.0f : 0.0f);
+    TrackId wanted = (battleHold > 0.0f) ? TRACK_BATTLE : TRACK_FIELD;
+
+    // A música de combate sempre começa do início, como no N64
+    if (wanted == TRACK_BATTLE && current != TRACK_BATTLE && loaded[TRACK_BATTLE] && volume[TRACK_BATTLE] < 0.01f)
+        SeekMusicStream(tracks[TRACK_BATTLE], 0.0f);
+    current = wanted;
+
+    for (int i = 0; i < TRACK_COUNT; i++)
+    {
+        if (!loaded[i]) continue;
+        float target = (i == (int)current) ? MUSIC_VOLUME : 0.0f;
+        if (volume[i] < target) volume[i] = fminf(target, volume[i] + FADE_SPEED*dt);
+        else volume[i] = fmaxf(target, volume[i] - FADE_SPEED*dt);
+        SetMusicVolume(tracks[i], muted ? 0.0f : volume[i]);
+        UpdateMusicStream(tracks[i]);
+    }
 }

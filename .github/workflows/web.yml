@@ -41,16 +41,26 @@ jobs:
           echo "::add-matcher::.github/gcc-matcher.json"
           mkdir -p public
           VERSION=$(echo "$GITHUB_SHA" | cut -c1-7)
-          # Banco de instrumentos com o nome pela impressão digital do conteúdo:
-          # só é baixado de novo quando muda
-          BANK=soundbank-$(sha1sum assets/soundbank.bin | cut -c1-8).bin
-          cp assets/soundbank.bin public/$BANK
           # Nome novo a cada build para o navegador nunca usar uma versão antiga do cache
           emcc src/*.c build/libraylib.a -o public/game-$VERSION.js -Os -Wall \
-            -Iraylib/src -DPLATFORM_WEB -DGAME_VERSION="\"$VERSION\"" -DSOUNDBANK_FILE="\"$BANK\"" \
+            -Iraylib/src -DPLATFORM_WEB -DGAME_VERSION="\"$VERSION\"" \
             -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1
           sed "s/__GAME_JS__/game-$VERSION.js/" web/index.html > public/index.html
           echo "{\"js\": \"game-$VERSION.js\"}" > public/version.json
+
+      - name: Converter as músicas para o estilo N64
+        run: |
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          mkdir -p public/music
+          for f in assets/music_src/*.mp3; do
+            name=$(basename "$f" .mp3)
+            # 32 kHz e agudos suavizados: o som mais "quente" dos cartuchos de N64.
+            # loudnorm deixa todas as faixas no mesmo volume.
+            ffmpeg -loglevel error -y -i "$f" \
+              -af "loudnorm=I=-16:TP=-1.5,lowpass=f=12000,aresample=32000" \
+              -c:a libvorbis -q:a 3 "public/music/$name.ogg"
+          done
+          ls -la public/music
 
       - uses: actions/upload-pages-artifact@v3
         with:

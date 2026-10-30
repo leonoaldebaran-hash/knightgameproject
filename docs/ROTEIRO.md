@@ -39,15 +39,19 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 | `songs.c` | As músicas, escritas em MML (sintaxe explicada no topo do arquivo) |
 | `music.c` | Carrega o banco de instrumentos, toca a música, camada de combate, tecla de silenciar |
 
-### Música
-- A música é **sequenciada como no N64**: notas em `src/songs.c`, tocadas por amostras de orquestra gravada.
-- O banco `assets/soundbank.bin` é montado por `tools/build_soundbank.py` (workflow `soundbank.yml`)
-  a partir de bibliotecas **CC0** (VSCO 2 CE e VCSL). Para mudar instrumentos, edite a lista no script.
-- As músicas do autor (`assets/music_src/*.mp3`) são **inspiração**. `tools/transcribe.py`
-  (workflow `transcribe.yml`, rodado à mão com o nome da faixa) extrai melodia, baixo e acordes.
+### Música (decisão do autor)
+- **A trilha são as músicas do autor feitas no Suno**, em `assets/music_src/*.mp3`. O build converte
+  cada uma para OGG com tratamento estilo N64 (32 kHz, agudos suavizados, volume igualado) em `public/music/`.
+- **Precisa de música nova?** O Claude escreve o **prompt para o Suno** (clima, instrumentos, andamento,
+  tom, referências), o autor gera a faixa e manda o arquivo, e o Claude a coloca no jogo.
+- Distribuição das faixas pelos lugares: tabela na seção "Trilha sonora" do [GDD](GDD.md).
+- `src/music.c` toca a faixa do lugar e troca para a de combate (com fade) quando um inimigo persegue o jogador.
+- Padrão pedido pelo autor: épico, cinematográfico e progressivo (Zelda, Nightwish), grave forte,
+  nada de som genérico de videogame, nada de caixa estridente.
+- Tentativa descartada: compor nota a nota no motor sequenciado (`src/synth.c`, `src/songs.c`,
+  banco CC0 `assets/soundbank.bin`). O resultado não agradou. O motor continua no código e pode servir
+  para vinhetas curtas (baú, item obtido, segredo).
 - Vozes: só grunhidos curtos. **Todo diálogo é texto.**
-- Padrão de qualidade pedido pelo autor: épico, cinematográfico e progressivo (Zelda, Nightwish),
-  com grave forte, nada de som genérico de videogame e nada de caixa estridente.
 
 ### Controles atuais
 | Ação | Teclado | Controle |
@@ -67,7 +71,7 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 - [x] Tarefa 4: combo de espada cancelável, escudo e bonecos de treino
 - [x] Tarefa 5: soldado inimigo com IA, vida em corações, escudo defendendo
 - [x] Tarefa 6: mira travada, andar em volta do alvo, salto lateral e mortal para trás
-- [x] Som: grunhidos, efeitos, motor de música N64 com orquestra gravada, tema do campo (em ajuste com o autor)
+- [x] Som: grunhidos e efeitos; trilha com as músicas do autor (After Future no campo, Paganini Fist no combate)
 
 ## Próximas tarefas
 **Fase 2: terminar o combate**
@@ -92,5 +96,5 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 **Depois:** templos 2 a 8, Thalassa e extras, povos e Aion, Castelo Imperial, Kairós a cavalo,
 transformação, Cronos no ar, epílogo, trilha de cada lugar e port final para o R36S.
 
-**Pendências de música:** guitarra distorcida e bumbo duplo (pegada Nightwish); temas de
-Black Waters, de cada templo, de Kairós e de Cronos.
+**Pendências de música:** prompts do Suno para as faixas que faltam (Thalassa, Gaia, templos da Terra,
+Ar, Sombras, Luz, Caos e Ordem, Johana/Reia, Hespérios, Cronos, final épico). Ver a tabela no GDD.
