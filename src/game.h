@@ -125,7 +125,7 @@ typedef struct Song {
     const char *name;
     float bpm;
     int channelCount;
-    SongChannel channels[16];
+    SongChannel channels[24];
 } Song;
 
 bool Synth_LoadBank(const unsigned char *data, int size);

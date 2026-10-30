@@ -8,9 +8,9 @@
 
 #define SYNTH_RATE      32000   // taxa típica dos cartuchos de N64
 #define TICKS_PER_BEAT  48      // resolução: 48 divisões por semínima
-#define MAX_CHANNELS    16
+#define MAX_CHANNELS    24
 #define MAX_EVENTS      2048
-#define MAX_VOICES      40
+#define MAX_VOICES      64
 #define MAX_BANK_SAMPLES 16
 #define BUFFER_FRAMES   1024
 
@@ -39,34 +39,40 @@ typedef struct Voice {
     float releaseLevel;
     float phase[4];           // coral sintetizado
     float bandA[3], lowA[3];
+    float dark;               // filtro que escurece o timbre
 } Voice;
 
-// Ataque, soltura, volume e se a nota toca até o fim da gravação (golpes, percussão)
-typedef struct InstrumentDef { float attack, release, gain; bool oneShot; } InstrumentDef;
+// Ataque, soltura, volume, se a nota toca até o fim da gravação (golpes, percussão)
+// e o quanto o timbre é escurecido (0 = sem filtro; quanto menor, mais abafado)
+typedef struct InstrumentDef { float attack, release, gain; bool oneShot; float darken; } InstrumentDef;
 
 static const InstrumentDef defs[INST_COUNT] = {
-    [INST_HORN]          = { 0.010f, 0.25f, 0.9f, false },
-    [INST_TRUMPET]       = { 0.005f, 0.20f, 0.8f, false },
-    [INST_TROMBONE]      = { 0.010f, 0.25f, 0.8f, false },
-    [INST_TUBA]          = { 0.010f, 0.25f, 0.9f, false },
-    [INST_VIOLINS]       = { 0.030f, 0.35f, 0.8f, false },
-    [INST_VIOLINS_SHORT] = { 0.002f, 0.10f, 0.8f, true  },
-    [INST_CELLOS]        = { 0.030f, 0.35f, 0.8f, false },
-    [INST_CELLOS_SHORT]  = { 0.002f, 0.10f, 0.9f, true  },
-    [INST_CONTRABASS]    = { 0.020f, 0.30f, 0.9f, false },
-    [INST_HARP]          = { 0.002f, 0.30f, 0.8f, true  },
-    [INST_FLUTE]         = { 0.020f, 0.25f, 0.8f, false },
-    [INST_OBOE]          = { 0.020f, 0.25f, 0.8f, false },
-    [INST_OCARINA]       = { 0.020f, 0.25f, 0.8f, false },
-    [INST_GLOCK]         = { 0.002f, 0.30f, 0.7f, true  },
-    [INST_TIMPANI]       = { 0.002f, 0.30f, 1.0f, true  },
-    [INST_SNARE]         = { 0.002f, 0.10f, 0.8f, true  },
-    [INST_BASSDRUM]      = { 0.002f, 0.20f, 1.0f, true  },
-    [INST_CYMBAL]        = { 0.002f, 0.40f, 0.7f, true  },
-    [INST_WARDRUM]       = { 0.002f, 0.20f, 1.0f, true  },
-    [INST_GONG]          = { 0.002f, 0.60f, 0.8f, true  },
-    [INST_CHOIR]         = { 0.300f, 0.60f, 0.5f, false },
+    [INST_HORN]          = { 0.010f, 0.30f, 0.9f, false, 0.0f  },
+    [INST_TRUMPET]       = { 0.005f, 0.20f, 0.8f, false, 0.0f  },
+    [INST_TROMBONE]      = { 0.010f, 0.30f, 0.9f, false, 0.0f  },
+    [INST_TUBA]          = { 0.010f, 0.30f, 1.0f, false, 0.0f  },
+    [INST_VIOLINS]       = { 0.040f, 0.40f, 0.8f, false, 0.0f  },
+    [INST_VIOLINS_SHORT] = { 0.002f, 0.10f, 0.8f, true,  0.0f  },
+    [INST_CELLOS]        = { 0.040f, 0.40f, 0.9f, false, 0.0f  },
+    [INST_CELLOS_SHORT]  = { 0.002f, 0.10f, 1.0f, true,  0.0f  },
+    [INST_CONTRABASS]    = { 0.030f, 0.40f, 1.0f, false, 0.0f  },
+    [INST_HARP]          = { 0.002f, 0.30f, 0.8f, true,  0.0f  },
+    [INST_FLUTE]         = { 0.020f, 0.25f, 0.8f, false, 0.0f  },
+    [INST_OBOE]          = { 0.020f, 0.25f, 0.8f, false, 0.0f  },
+    [INST_OCARINA]       = { 0.020f, 0.30f, 0.8f, false, 0.0f  },
+    [INST_GLOCK]         = { 0.002f, 0.30f, 0.6f, true,  0.0f  },
+    [INST_TIMPANI]       = { 0.002f, 0.30f, 1.0f, true,  0.0f  },
+    [INST_SNARE]         = { 0.002f, 0.10f, 0.6f, true,  0.30f },   // caixa bem mais escura
+    [INST_BASSDRUM]      = { 0.002f, 0.20f, 1.0f, true,  0.0f  },
+    [INST_CYMBAL]        = { 0.002f, 0.40f, 0.6f, true,  0.45f },
+    [INST_WARDRUM]       = { 0.002f, 0.20f, 1.0f, true,  0.0f  },
+    [INST_GONG]          = { 0.002f, 0.60f, 0.8f, true,  0.0f  },
+    [INST_CHOIR]         = { 0.300f, 0.60f, 0.5f, false, 0.0f  },
 };
+
+// Equalizador final: mais grave e menos agudo estridente (o som "quente" das trilhas do N64)
+typedef struct Biquad { float b0, b1, b2, a1, a2, z1, z2; } Biquad;
+static Biquad lowShelf[2], highShelf[2];
 
 static AudioStream stream;
 static BankInstrument bank[BANK_COUNT];
@@ -167,6 +173,34 @@ static void ParseMml(const char *s, const char *end, MmlState *st)
             int ticks = ReadLength(&s, st->length);
             if (st->ch->count < MAX_EVENTS)
                 st->ch->events[st->ch->count++] = (NoteEvent){ st->tick, ticks, (st->octave + 1)*12 + semi, st->velocity };
+            st->tick += ticks;
+        }
+        else if (c == '(')
+        {
+            // Acorde: as notas entre parênteses começam juntas, com a duração depois do ")".
+            // Mudanças de oitava dentro do acorde valem só para ele.
+            int savedOctave = st->octave;
+            int midis[8], n = 0;
+            while (s < end && *s && *s != ')')
+            {
+                char k = *s++;
+                if (k >= 'a' && k <= 'g' && n < 8)
+                {
+                    int semi = semis[k - 'a'];
+                    if (*s == '+' || *s == '#') { semi++; s++; }
+                    else if (*s == '-') { semi--; s++; }
+                    midis[n++] = (st->octave + 1)*12 + semi;
+                }
+                else if (k == 'o') st->octave = ReadNumber(&s);
+                else if (k == '<') st->octave--;
+                else if (k == '>') st->octave++;
+            }
+            if (s < end && *s == ')') s++;
+            st->octave = savedOctave;
+
+            int ticks = ReadLength(&s, st->length);
+            for (int k = 0; k < n && st->ch->count < MAX_EVENTS; k++)
+                st->ch->events[st->ch->count++] = (NoteEvent){ st->tick, ticks, midis[k], st->velocity };
             st->tick += ticks;
         }
         else if (c == 'r') st->tick += ReadLength(&s, st->length);
@@ -284,6 +318,9 @@ static float RenderVoice(Voice *v)
         float frac = (float)(v->pos - i);
         out = (v->sample->data[i]*(1.0f - frac) + v->sample->data[i + 1]*frac)/32768.0f;
         v->pos += v->step;
+
+        float darken = defs[v->instrument].darken;
+        if (darken > 0.0f) { v->dark += (out - v->dark)*darken; out = v->dark*1.4f; }
     }
     else if (v->instrument == INST_CHOIR) out = RenderChoir(v);
     else return 0.0f;
@@ -322,6 +359,35 @@ static float Reverb(int side, float in)
         out = y;
     }
     return out*0.25f;
+}
+
+// Filtros "shelf" (receitas de Robert Bristow-Johnson): realçam ou atenuam graves/agudos
+static Biquad MakeShelf(bool low, float freq, float gainDb)
+{
+    float A = powf(10.0f, gainDb/40.0f);
+    float w0 = 2.0f*PI*freq/SYNTH_RATE;
+    float cw = cosf(w0), alpha = sinf(w0)/2.0f*sqrtf(2.0f);
+    float sa = 2.0f*sqrtf(A)*alpha;
+    float b0, b1, b2, a0, a1, a2;
+    if (low)
+    {
+        b0 = A*((A + 1) - (A - 1)*cw + sa);  b1 = 2*A*((A - 1) - (A + 1)*cw);  b2 = A*((A + 1) - (A - 1)*cw - sa);
+        a0 = (A + 1) + (A - 1)*cw + sa;      a1 = -2*((A - 1) + (A + 1)*cw);   a2 = (A + 1) + (A - 1)*cw - sa;
+    }
+    else
+    {
+        b0 = A*((A + 1) + (A - 1)*cw + sa);  b1 = -2*A*((A - 1) + (A + 1)*cw); b2 = A*((A + 1) + (A - 1)*cw - sa);
+        a0 = (A + 1) - (A - 1)*cw + sa;      a1 = 2*((A - 1) - (A + 1)*cw);    a2 = (A + 1) - (A - 1)*cw - sa;
+    }
+    return (Biquad){ b0/a0, b1/a0, b2/a0, a1/a0, a2/a0, 0.0f, 0.0f };
+}
+
+static float ProcessBiquad(Biquad *f, float x)
+{
+    float y = f->b0*x + f->z1;
+    f->z1 = f->b1*x - f->a1*y + f->z2;
+    f->z2 = f->b2*x - f->a2*y;
+    return y;
 }
 
 // Avança a partitura um tick: solta notas novas e reinicia no fim (loop)
@@ -387,6 +453,9 @@ static void SynthCallback(void *buffer, unsigned int frames)
             float dryL = left, dryR = right;
             left = dryL + Reverb(0, (dryL + dryR)*0.5f);
             right = dryR + Reverb(1, (dryL + dryR)*0.5f);
+
+            left = ProcessBiquad(&highShelf[0], ProcessBiquad(&lowShelf[0], left));
+            right = ProcessBiquad(&highShelf[1], ProcessBiquad(&lowShelf[1], right));
         }
         out[i*2] = (short)(tanhf(left*volume*0.5f)*30000.0f);    // limita sem estourar
         out[i*2 + 1] = (short)(tanhf(right*volume*0.5f)*30000.0f);
@@ -395,6 +464,12 @@ static void SynthCallback(void *buffer, unsigned int frames)
 
 void Synth_Init(void)
 {
+    for (int s = 0; s < 2; s++)
+    {
+        lowShelf[s] = MakeShelf(true, 140.0f, 6.0f);     // +6 dB nos graves
+        highShelf[s] = MakeShelf(false, 5000.0f, -4.0f); // -4 dB nos agudos
+    }
+
     SetAudioStreamBufferSizeDefault(BUFFER_FRAMES);
     stream = LoadAudioStream(SYNTH_RATE, 16, 2);
     SetAudioStreamCallback(stream, SynthCallback);
