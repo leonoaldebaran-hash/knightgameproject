@@ -101,12 +101,15 @@ float Target_BarAmount(void);   // 0 a 1: faixas pretas de cinema na tela
 void Music_Init(void);
 void Music_Update(bool inBattle, float dt);
 
-// Sintetizador e sequenciador no estilo N64 (synth.c)
+// Sequenciador no estilo N64 tocando orquestra gravada (synth.c).
+// A ordem dos instrumentos do banco é a mesma de tools/build_soundbank.py.
 typedef enum {
-    INST_STRINGS, INST_FLUTE, INST_BRASS, INST_HARP,
-    INST_BASS, INST_CHOIR, INST_BELL, INST_DRUMS,
-    INST_TIMPANI,    // tímpano de orquestra
-    INST_STACCATO,   // cordas curtas e marcadas, para ritmos rápidos
+    INST_HORN, INST_TRUMPET, INST_TROMBONE, INST_TUBA,
+    INST_VIOLINS, INST_VIOLINS_SHORT, INST_CELLOS, INST_CELLOS_SHORT, INST_CONTRABASS,
+    INST_HARP, INST_FLUTE, INST_OBOE, INST_OCARINA, INST_GLOCK,
+    INST_TIMPANI, INST_SNARE, INST_BASSDRUM, INST_CYMBAL, INST_WARDRUM, INST_GONG,
+    BANK_COUNT,
+    INST_CHOIR = BANK_COUNT,   // coral sintetizado (não há coral gravado livre)
     INST_COUNT
 } InstrumentId;
 
@@ -115,15 +118,18 @@ typedef struct SongChannel {
     float volume;
     int layer;          // 0 = toca sempre; 1 = só entra com intensidade (combate)
     const char *mml;    // as notas, em MML
+    float pan;          // -1 esquerda, 0 centro, 1 direita
 } SongChannel;
 
 typedef struct Song {
     const char *name;
     float bpm;
     int channelCount;
-    SongChannel channels[8];
+    SongChannel channels[16];
 } Song;
 
+bool Synth_LoadBank(const unsigned char *data, int size);
+bool Synth_BankLoaded(void);
 void Synth_Init(void);
 void Synth_Play(const Song *song);
 void Synth_SetIntensity(float amount);

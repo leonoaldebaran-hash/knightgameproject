@@ -1,58 +1,76 @@
 #include "game.h"
+#include <stdlib.h>
 #include <string.h>
 
-// Música sequenciada no estilo do N64: as notas ficam escritas no código (em MML)
-// e são tocadas ao vivo por instrumentos sintetizados, nota por nota.
+// Música sequenciada no estilo do N64: a partitura fica escrita no código (em MML)
+// e é tocada ao vivo, nota por nota, por instrumentos de orquestra gravados
+// (banco em assets/soundbank.bin, montado por tools/build_soundbank.py).
 
 #define SYNTH_RATE      32000   // taxa típica dos cartuchos de N64
 #define TICKS_PER_BEAT  48      // resolução: 48 divisões por semínima
-#define MAX_CHANNELS    8
-#define MAX_EVENTS      1024
-#define MAX_VOICES      28
-#define KS_MAX          1200    // memória da corda dedilhada (nota mais grave ~27 Hz)
+#define MAX_CHANNELS    16
+#define MAX_EVENTS      2048
+#define MAX_VOICES      40
+#define MAX_BANK_SAMPLES 16
 #define BUFFER_FRAMES   1024
 
 typedef struct NoteEvent { int start, length, midi; float velocity; } NoteEvent;
 
 typedef struct Channel {
     int instrument;
-    float volume;
+    float volume, panL, panR;
     int layer;
     NoteEvent events[MAX_EVENTS];
     int count;
     int next;
 } Channel;
 
+typedef struct BankSample { float root; int frames; const short *data; } BankSample;
+typedef struct BankInstrument { bool unpitched; int count; BankSample samples[MAX_BANK_SAMPLES]; } BankInstrument;
+
 typedef struct Voice {
     bool active;
     int instrument, channel;
+    const BankSample *sample;
+    double pos, step;
     float freq, velocity;
     float time, holdTime;     // segundos desde o início / duração da nota
     float released;           // segundos desde a soltura (< 0 = ainda segurando)
     float releaseLevel;
-    float phase[3];
-    float lp, lp2;
-    float ks[KS_MAX];
-    int ksLen, ksPos;
-    int drum;
+    float phase[4];           // coral sintetizado
+    float bandA[3], lowA[3];
 } Voice;
 
-typedef struct InstrumentDef { float attack, decay, sustain, release, gain; } InstrumentDef;
+// Ataque, soltura, volume e se a nota toca até o fim da gravação (golpes, percussão)
+typedef struct InstrumentDef { float attack, release, gain; bool oneShot; } InstrumentDef;
 
 static const InstrumentDef defs[INST_COUNT] = {
-    [INST_STRINGS] = { 0.08f, 0.30f, 0.80f, 0.35f, 0.55f },
-    [INST_FLUTE]   = { 0.05f, 0.10f, 0.90f, 0.15f, 0.50f },
-    [INST_BRASS]   = { 0.03f, 0.25f, 0.85f, 0.15f, 0.65f },
-    [INST_HARP]    = { 0.00f, 0.00f, 1.00f, 0.25f, 0.70f },
-    [INST_BASS]    = { 0.01f, 0.30f, 0.60f, 0.08f, 0.70f },
-    [INST_CHOIR]   = { 0.25f, 0.30f, 0.85f, 0.50f, 0.45f },
-    [INST_BELL]    = { 0.00f, 0.00f, 1.00f, 0.80f, 0.40f },
-    [INST_DRUMS]   = { 0.00f, 0.00f, 1.00f, 0.05f, 0.80f },
-    [INST_TIMPANI] = { 0.00f, 0.00f, 1.00f, 0.30f, 0.90f },
-    [INST_STACCATO]= { 0.005f, 0.08f, 0.45f, 0.06f, 0.50f },
+    [INST_HORN]          = { 0.010f, 0.25f, 0.9f, false },
+    [INST_TRUMPET]       = { 0.005f, 0.20f, 0.8f, false },
+    [INST_TROMBONE]      = { 0.010f, 0.25f, 0.8f, false },
+    [INST_TUBA]          = { 0.010f, 0.25f, 0.9f, false },
+    [INST_VIOLINS]       = { 0.030f, 0.35f, 0.8f, false },
+    [INST_VIOLINS_SHORT] = { 0.002f, 0.10f, 0.8f, true  },
+    [INST_CELLOS]        = { 0.030f, 0.35f, 0.8f, false },
+    [INST_CELLOS_SHORT]  = { 0.002f, 0.10f, 0.9f, true  },
+    [INST_CONTRABASS]    = { 0.020f, 0.30f, 0.9f, false },
+    [INST_HARP]          = { 0.002f, 0.30f, 0.8f, true  },
+    [INST_FLUTE]         = { 0.020f, 0.25f, 0.8f, false },
+    [INST_OBOE]          = { 0.020f, 0.25f, 0.8f, false },
+    [INST_OCARINA]       = { 0.020f, 0.25f, 0.8f, false },
+    [INST_GLOCK]         = { 0.002f, 0.30f, 0.7f, true  },
+    [INST_TIMPANI]       = { 0.002f, 0.30f, 1.0f, true  },
+    [INST_SNARE]         = { 0.002f, 0.10f, 0.8f, true  },
+    [INST_BASSDRUM]      = { 0.002f, 0.20f, 1.0f, true  },
+    [INST_CYMBAL]        = { 0.002f, 0.40f, 0.7f, true  },
+    [INST_WARDRUM]       = { 0.002f, 0.20f, 1.0f, true  },
+    [INST_GONG]          = { 0.002f, 0.60f, 0.8f, true  },
+    [INST_CHOIR]         = { 0.300f, 0.60f, 0.5f, false },
 };
 
 static AudioStream stream;
+static BankInstrument bank[BANK_COUNT];
+static bool bankLoaded = false;
 static Channel channels[MAX_CHANNELS];
 static int channelCount = 0;
 static Voice voices[MAX_VOICES];
@@ -66,17 +84,48 @@ static float masterVolume = 0.8f;
 static bool muted = false;
 static float layerTarget[2] = { 1.0f, 0.0f }, layerGain[2] = { 1.0f, 0.0f };
 
-// Eco simples (2 filtros pente + 1 passa-tudo): a "sala" típica das trilhas de N64
-static float combA[860], combB[930], allp[400];
-static int combAPos, combBPos, allpPos;
-static float combALp, combBLp;
-
 static float Noise(void)
 {
     noiseState ^= noiseState << 13;
     noiseState ^= noiseState >> 17;
     noiseState ^= noiseState << 5;
     return (float)(noiseState & 0xFFFF)/32768.0f - 1.0f;
+}
+
+// ---------------------------------------------------------------------------
+// Banco de instrumentos gravados
+// ---------------------------------------------------------------------------
+static unsigned int ReadU32(const unsigned char *p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((unsigned int)p[3] << 24); }
+
+bool Synth_LoadBank(const unsigned char *data, int size)
+{
+    if (size < 12 || memcmp(data, "KGSB", 4) != 0) return false;
+
+    const unsigned char *p = data + 12;
+    const unsigned char *end = data + size;
+    int count = (int)ReadU32(data + 8);
+    if (count > BANK_COUNT) count = BANK_COUNT;
+
+    for (int i = 0; i < count && p + 2 <= end; i++)
+    {
+        BankInstrument *inst = &bank[i];
+        inst->unpitched = p[0];
+        inst->count = p[1];
+        if (inst->count > MAX_BANK_SAMPLES) inst->count = MAX_BANK_SAMPLES;
+        p += 2;
+
+        for (int s = 0; s < inst->count && p + 8 <= end; s++)
+        {
+            float root;
+            memcpy(&root, p, 4);
+            int frames = (int)ReadU32(p + 4);
+            p += 8;
+            inst->samples[s] = (BankSample){ root, frames, (const short *)p };
+            p += frames*2;
+        }
+    }
+    bankLoaded = true;
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,15 +196,25 @@ static void ParseMml(const char *s, const char *end, MmlState *st)
 }
 
 // ---------------------------------------------------------------------------
-// Vozes e instrumentos
+// Vozes
 // ---------------------------------------------------------------------------
-static float MidiToFreq(int midi)
-{
-    return 440.0f*powf(2.0f, (midi - 69)/12.0f);
-}
-
 static void NoteOn(int channel, const NoteEvent *e)
 {
+    Channel *ch = &channels[channel];
+    const BankSample *sample = NULL;
+    double step = 1.0;
+
+    if (ch->instrument < BANK_COUNT)
+    {
+        // Escolhe a gravação mais próxima da nota e muda a altura dela, como no N64
+        const BankInstrument *inst = &bank[ch->instrument];
+        if (inst->count == 0) return;
+        sample = &inst->samples[0];
+        for (int i = 1; i < inst->count; i++)
+            if (fabsf(inst->samples[i].root - e->midi) < fabsf(sample->root - e->midi)) sample = &inst->samples[i];
+        step = inst->unpitched ? pow(2.0, (e->midi - 60)/12.0) : pow(2.0, (e->midi - sample->root)/12.0);
+    }
+
     // Usa uma voz livre; se não houver, rouba a mais antiga
     Voice *v = NULL;
     for (int i = 0; i < MAX_VOICES && !v; i++) if (!voices[i].active) v = &voices[i];
@@ -165,187 +224,104 @@ static void NoteOn(int channel, const NoteEvent *e)
         for (int i = 1; i < MAX_VOICES; i++) if (voices[i].time > v->time) v = &voices[i];
     }
 
-    Channel *ch = &channels[channel];
-    memset(v->phase, 0, sizeof(v->phase));
+    memset(v, 0, sizeof(*v));
     v->active = true;
     v->instrument = ch->instrument;
     v->channel = channel;
-    v->freq = MidiToFreq(e->midi);
+    v->sample = sample;
+    v->step = step;
+    v->freq = 440.0f*powf(2.0f, (e->midi - 69)/12.0f);
     v->velocity = e->velocity*ch->volume;
-    v->time = 0.0f;
     v->holdTime = e->length*60.0f/(bpm*TICKS_PER_BEAT);
     v->released = -1.0f;
-    v->lp = v->lp2 = 0.0f;
-    v->drum = e->midi % 12;   // na bateria: c bumbo, d caixa, e/f chimbal, g tom, a prato
-
-    if (v->instrument == INST_HARP)
-    {
-        // Corda dedilhada (Karplus-Strong): começa com ruído e vai se "afinando"
-        v->ksLen = (int)Clamp(SYNTH_RATE/v->freq, 2, KS_MAX);
-        v->ksPos = 0;
-        for (int i = 0; i < v->ksLen; i++) v->ks[i] = Noise();
-    }
-    if (v->instrument == INST_DRUMS) v->holdTime = (v->drum >= 9) ? 1.6f : 0.4f;   // o prato soa longo
-    if (v->instrument == INST_TIMPANI) v->holdTime = fmaxf(v->holdTime, 1.2f);
+    if (defs[v->instrument].oneShot && sample) v->holdTime = (float)(sample->frames/step)/SYNTH_RATE;
 }
 
 static float Envelope(Voice *v)
 {
     const InstrumentDef *d = &defs[v->instrument];
-    float t = v->time, level;
-    if (t < d->attack) level = t/d->attack;
-    else if (t < d->attack + d->decay) level = Lerp(1.0f, d->sustain, (t - d->attack)/d->decay);
-    else level = d->sustain;
-
+    float level = (v->time < d->attack) ? v->time/d->attack : 1.0f;
     if (v->released < 0.0f) return level;
     return v->releaseLevel*fmaxf(0.0f, 1.0f - v->released/d->release);
 }
 
-static float Advance(float *phase, float freq)
+// Coral sintetizado: vozes desafinadas com vibrato passando por filtros que formam o "ah"
+static float RenderChoir(Voice *v)
 {
-    *phase += freq/SYNTH_RATE;
-    if (*phase >= 1.0f) *phase -= floorf(*phase);
-    return *phase;
+    static const float formants[3] = { 800.0f, 1150.0f, 2900.0f };
+    static const float weights[3] = { 1.0f, 0.6f, 0.25f };
+    static const float detune[4] = { 0.993f, 0.998f, 1.003f, 1.008f };
+
+    float vib = 1.0f + 0.006f*sinf(2.0f*PI*5.2f*v->time);
+    float src = 0.0f;
+    for (int k = 0; k < 4; k++)
+    {
+        v->phase[k] += v->freq*vib*detune[k]/SYNTH_RATE;
+        if (v->phase[k] >= 1.0f) v->phase[k] -= 1.0f;
+        src += 2.0f*v->phase[k] - 1.0f;
+    }
+    src = src*0.25f + Noise()*0.05f;
+
+    float out = 0.0f;
+    for (int k = 0; k < 3; k++)
+    {
+        float f = 2.0f*sinf(PI*formants[k]/SYNTH_RATE);
+        float high = src - v->lowA[k] - 0.25f*v->bandA[k];
+        v->bandA[k] += f*high;
+        v->lowA[k] += f*v->bandA[k];
+        out += v->bandA[k]*weights[k];
+    }
+    return out*0.6f;
 }
 
 static float RenderVoice(Voice *v)
 {
-    float t = v->time;
-    float vib = 1.0f + 0.004f*sinf(2.0f*PI*5.0f*t)*fminf(1.0f, t/0.3f);   // vibrato que entra devagar
-    float out = 0.0f;
-
-    switch (v->instrument)
+    float out;
+    if (v->sample)
     {
-        case INST_STRINGS:   // duas ondas dente de serra levemente desafinadas, filtradas
-        {
-            float a = Advance(&v->phase[0], v->freq*vib*0.997f);
-            float b = Advance(&v->phase[1], v->freq*vib*1.003f);
-            float saw = (a + b) - 1.0f;
-            v->lp += (saw - v->lp)*0.22f;
-            out = v->lp;
-        } break;
-
-        case INST_FLUTE:     // senoide com um pouco de sopro
-        {
-            float p = Advance(&v->phase[0], v->freq*vib);
-            float tone = sinf(2.0f*PI*p) + 0.15f*sinf(4.0f*PI*p);
-            v->lp += (Noise()*0.08f - v->lp)*0.1f;
-            out = tone + v->lp;
-        } break;
-
-        case INST_BRASS:     // naipe de metais: 3 dentes de serra desafinadas, filtro que "rasga" no ataque
-        {
-            const float detune[3] = { 0.994f, 1.0f, 1.006f };
-            float saw = 0.0f;
-            for (int k = 0; k < 3; k++) saw += 2.0f*Advance(&v->phase[k], v->freq*vib*detune[k]) - 1.0f;
-            saw *= 0.45f;
-            float cutoff = 0.16f + 0.45f*fminf(1.0f, t/0.04f)*expf(-t*3.0f);
-            v->lp += (saw - v->lp)*cutoff;
-            v->lp2 += (v->lp - v->lp2)*cutoff;
-            out = tanhf(v->lp2*2.2f);   // leve saturação: som de metal soprado com força
-        } break;
-
-        case INST_STACCATO:  // cordas curtas: dente de serra brilhante
-        {
-            float a = Advance(&v->phase[0], v->freq*0.998f);
-            float b = Advance(&v->phase[1], v->freq*1.002f);
-            float saw = (a + b) - 1.0f;
-            v->lp += (saw - v->lp)*0.35f;
-            out = v->lp;
-        } break;
-
-        case INST_TIMPANI:   // tímpano: tom grave que cai um pouco, com batida de ruído
-        {
-            float p = Advance(&v->phase[0], v->freq*(1.0f + 0.08f*expf(-t*20.0f)));
-            float q = Advance(&v->phase[1], v->freq*1.5f);
-            float body = (sinf(2.0f*PI*p) + 0.3f*sinf(2.0f*PI*q))*expf(-t*2.2f);
-            out = body*1.3f + Noise()*expf(-t*40.0f)*0.4f;
-        } break;
-
-        case INST_HARP:
-        {
-            int next = (v->ksPos + 1) % v->ksLen;
-            out = v->ks[v->ksPos];
-            v->ks[v->ksPos] = 0.5f*(v->ks[v->ksPos] + v->ks[next])*0.997f;
-            v->ksPos = next;
-        } break;
-
-        case INST_BASS:      // triângulo com um pouco de onda quadrada
-        {
-            float p = Advance(&v->phase[0], v->freq);
-            out = (4.0f*fabsf(p - 0.5f) - 1.0f)*0.8f + ((p < 0.5f) ? 0.15f : -0.15f);
-        } break;
-
-        case INST_CHOIR:     // três vozes de senoides com harmônicos
-        {
-            const float detune[3] = { 0.995f, 1.0f, 1.005f };
-            for (int k = 0; k < 3; k++)
-            {
-                float p = Advance(&v->phase[k], v->freq*vib*detune[k]);
-                out += sinf(2.0f*PI*p) + 0.4f*sinf(4.0f*PI*p) + 0.2f*sinf(6.0f*PI*p);
-            }
-            out *= 0.3f;
-        } break;
-
-        case INST_BELL:      // síntese FM: som metálico de sino
-        {
-            float c = Advance(&v->phase[0], v->freq);
-            float m = Advance(&v->phase[1], v->freq*3.5f);
-            out = sinf(2.0f*PI*c + 2.0f*sinf(2.0f*PI*m)*expf(-t*3.0f))*expf(-t*2.5f);
-        } break;
-
-        case INST_DRUMS:
-            if (v->drum == 0)          // bumbo: senoide caindo de tom
-            {
-                float p = Advance(&v->phase[0], Lerp(45.0f, 150.0f, expf(-t*25.0f)));
-                out = sinf(2.0f*PI*p)*expf(-t*12.0f)*1.4f;
-            }
-            else if (v->drum <= 3)     // caixa: ruído + tom
-            {
-                float p = Advance(&v->phase[0], 185.0f);
-                out = (Noise()*0.8f + sinf(2.0f*PI*p)*0.5f)*expf(-t*18.0f);
-            }
-            else if (v->drum <= 5)     // chimbal: ruído agudo bem curto
-            {
-                float n = Noise();
-                v->lp += (n - v->lp)*0.5f;
-                out = (n - v->lp)*expf(-t*45.0f)*0.6f;
-            }
-            else if (v->drum <= 8)     // tom: tambor grave de guerra
-            {
-                float p = Advance(&v->phase[0], Lerp(80.0f, 130.0f, expf(-t*15.0f)));
-                out = (sinf(2.0f*PI*p)*1.2f + Noise()*0.2f*expf(-t*30.0f))*expf(-t*7.0f);
-            }
-            else                       // prato: ruído brilhante que soa longo
-            {
-                float n = Noise();
-                v->lp += (n - v->lp)*0.6f;
-                out = (n - v->lp)*expf(-t*2.5f)*0.55f;
-            }
-            break;
+        int i = (int)v->pos;
+        if (i + 1 >= v->sample->frames) { v->active = false; return 0.0f; }
+        float frac = (float)(v->pos - i);
+        out = (v->sample->data[i]*(1.0f - frac) + v->sample->data[i + 1]*frac)/32768.0f;
+        v->pos += v->step;
     }
+    else if (v->instrument == INST_CHOIR) out = RenderChoir(v);
+    else return 0.0f;
 
     return out*Envelope(v)*defs[v->instrument].gain*v->velocity;
 }
 
-static float Reverb(float in)
+// ---------------------------------------------------------------------------
+// Reverberação de salão (Freeverb simplificado, estéreo): a "catedral" das trilhas épicas
+// ---------------------------------------------------------------------------
+#define COMBS 4
+static const int combLen[2][COMBS] = { { 810, 862, 927, 984 }, { 827, 879, 944, 1001 } };
+static const int allLen[2][2] = { { 403, 320 }, { 420, 337 } };
+static float combBuf[2][COMBS][1001], combStore[2][COMBS];
+static int combPos[2][COMBS];
+static float allBuf[2][2][420];
+static int allPos[2][2];
+
+static float Reverb(int side, float in)
 {
-    float a = combA[combAPos];
-    combALp += (a - combALp)*0.4f;
-    combA[combAPos] = in + combALp*0.78f;
-    combAPos = (combAPos + 1) % (int)(sizeof(combA)/sizeof(float));
-
-    float b = combB[combBPos];
-    combBLp += (b - combBLp)*0.4f;
-    combB[combBPos] = in + combBLp*0.76f;
-    combBPos = (combBPos + 1) % (int)(sizeof(combB)/sizeof(float));
-
-    float sum = (a + b)*0.5f;
-    float buf = allp[allpPos];
-    float outp = -sum + buf;
-    allp[allpPos] = sum + buf*0.5f;
-    allpPos = (allpPos + 1) % (int)(sizeof(allp)/sizeof(float));
-    return outp;
+    float out = 0.0f;
+    for (int c = 0; c < COMBS; c++)
+    {
+        float y = combBuf[side][c][combPos[side][c]];
+        combStore[side][c] = y*0.7f + combStore[side][c]*0.3f;   // abafa os agudos do eco
+        combBuf[side][c][combPos[side][c]] = in + combStore[side][c]*0.84f;
+        combPos[side][c] = (combPos[side][c] + 1) % combLen[side][c];
+        out += y;
+    }
+    for (int a = 0; a < 2; a++)
+    {
+        float buf = allBuf[side][a][allPos[side][a]];
+        float y = -out + buf;
+        allBuf[side][a][allPos[side][a]] = out + buf*0.5f;
+        allPos[side][a] = (allPos[side][a] + 1) % allLen[side][a];
+        out = y;
+    }
+    return out*0.25f;
 }
 
 // Avança a partitura um tick: solta notas novas e reinicia no fim (loop)
@@ -368,15 +344,16 @@ static void StepTick(void)
     }
 }
 
-// Roda na thread de áudio: gera cada amostra na hora
+// Roda na thread de áudio: gera cada amostra na hora, em estéreo
 static void SynthCallback(void *buffer, unsigned int frames)
 {
     short *out = (short *)buffer;
     double samplesPerTick = SYNTH_RATE*60.0/(bpm*TICKS_PER_BEAT);
+    float volume = muted ? 0.0f : masterVolume;
 
     for (unsigned int i = 0; i < frames; i++)
     {
-        float mix = 0.0f;
+        float left = 0.0f, right = 0.0f;
         if (playing)
         {
             tickAcc += 1.0;
@@ -389,8 +366,10 @@ static void SynthCallback(void *buffer, unsigned int frames)
                 Voice *v = &voices[k];
                 if (!v->active) continue;
 
-                float s = RenderVoice(v)*layerGain[channels[v->channel].layer];
-                mix += s;
+                Channel *ch = &channels[v->channel];
+                float s = RenderVoice(v)*layerGain[ch->layer];
+                left += s*ch->panL;
+                right += s*ch->panR;
 
                 v->time += 1.0f/SYNTH_RATE;
                 if (v->released < 0.0f && v->time >= v->holdTime)
@@ -404,17 +383,20 @@ static void SynthCallback(void *buffer, unsigned int frames)
                     if (v->released >= defs[v->instrument].release) v->active = false;
                 }
             }
-            mix += Reverb(mix*0.5f)*0.35f;
+
+            float dryL = left, dryR = right;
+            left = dryL + Reverb(0, (dryL + dryR)*0.5f);
+            right = dryR + Reverb(1, (dryL + dryR)*0.5f);
         }
-        mix = tanhf(mix*(muted ? 0.0f : masterVolume)*0.6f);   // limita o volume sem estourar
-        out[i] = (short)(mix*30000.0f);
+        out[i*2] = (short)(tanhf(left*volume*0.5f)*30000.0f);    // limita sem estourar
+        out[i*2 + 1] = (short)(tanhf(right*volume*0.5f)*30000.0f);
     }
 }
 
 void Synth_Init(void)
 {
     SetAudioStreamBufferSizeDefault(BUFFER_FRAMES);
-    stream = LoadAudioStream(SYNTH_RATE, 16, 1);
+    stream = LoadAudioStream(SYNTH_RATE, 16, 2);
     SetAudioStreamCallback(stream, SynthCallback);
     PlayAudioStream(stream);
 }
@@ -434,6 +416,8 @@ void Synth_Play(const Song *song)
         ch->instrument = sc->instrument;
         ch->volume = sc->volume;
         ch->layer = sc->layer;
+        ch->panL = cosf((sc->pan + 1.0f)*PI/4.0f);   // panorama estéreo com potência constante
+        ch->panR = sinf((sc->pan + 1.0f)*PI/4.0f);
         ch->count = 0;
         ch->next = 0;
 
@@ -445,6 +429,11 @@ void Synth_Play(const Song *song)
     tick = 0;
     tickAcc = 0.0;
     playing = true;
+}
+
+bool Synth_BankLoaded(void)
+{
+    return bankLoaded;
 }
 
 void Synth_SetIntensity(float amount)
