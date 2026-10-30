@@ -56,8 +56,11 @@ HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
     {
         p->vel = Vector3Scale(away, BLOCK_PUSH);
         p->blockFlash = 0.12f;
+        Sfx_Play(SFX_BLOCK);
         return HIT_BLOCKED;
     }
+
+    Sfx_Play(SFX_HURT);
 
     p->hp -= damage;
     p->state = PSTATE_HURT;
@@ -108,6 +111,7 @@ static void StartAttack(Player *p, int step, Vector3 wishDir)
     p->attackStep = step;
     p->attackTimer = 0.0f;
     p->attackId++;
+    Sfx_Play(SFX_SWING);
 }
 
 static void UpdateNormal(Player *p, Vector3 wishDir, float dt)
@@ -150,8 +154,9 @@ static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool sh
 
     if (t >= a->hitStart && t <= a->hitEnd)
     {
-        Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
-        Soldiers_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
+        int hits = Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId)
+                 + Soldiers_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
+        if (hits > 0) Sfx_Play(SFX_HIT);
     }
 
     if (t >= 1.0f) p->state = PSTATE_NORMAL;

@@ -78,6 +78,17 @@ Vector3 Dummies_Collide(Vector3 pos, float radius);
 void Dummies_Draw(void);
 int Dummies_TotalHits(void);
 
+bool Soldiers_Engaged(void);
+
+// Música (music.c)
+void Music_Init(void);
+void Music_Update(bool inBattle, float dt);
+
+// Efeitos sonoros (sfx.c)
+typedef enum { SFX_SWING, SFX_HIT, SFX_BLOCK, SFX_HURT, SFX_ALERT, SFX_COUNT } SfxId;
+void Sfx_Init(void);
+void Sfx_Play(SfxId id);
+
 // Câmera (camera.c)
 void GameCamera_Init(GameCamera *c);
 void GameCamera_Update(GameCamera *c, const Player *p, float dt);

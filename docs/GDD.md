@@ -243,6 +243,17 @@ Os valores serão ajustados comparando gravações frame a frame do Ship of Hark
 ## 10. Trilha sonora
 - Orquestra épica + coral + guitarra no estilo anos 80, no clima de Cavaleiros do Zodíaco e Ocarina of Time.
 - Composições originais (geradas com IA); não reproduzir melodias existentes.
+- **Base da trilha:** músicas compostas pelo autor do jogo com IA (álbuns *After Image*). Os arquivos originais ficam em `assets/music_src/` e o build converte para OGG no estilo N64 (32 kHz, agudos suavizados, volume igualado).
+- Novas faixas e variações por lugar e clima são geradas a partir dessas, mantendo o mesmo tema.
+
+| Faixa | Uso planejado |
+|---|---|
+| Get Ready | Tela título |
+| Boas vindas primavera | Black Waters Village |
+| After Future | Campo de Pangea *(em uso)* |
+| Paganini Fist | Combate *(em uso)* |
+| Ember Heart (partes 1 a 3) | Templo do Fogo: exploração, mini-chefe e chefe |
+| Crimson Sky Requiem | Tema de Kairós e momentos sombrios |
 
 ## 11. Pendências
 - [ ] Nomes dos 8 Guardiões Titânicos

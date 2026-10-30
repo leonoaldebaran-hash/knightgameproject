@@ -45,6 +45,20 @@ jobs:
             -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1
           sed "s/__GAME_JS__/game-$VERSION.js/" web/index.html > public/index.html
 
+      - name: Converter as músicas para o estilo N64
+        run: |
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          mkdir -p public/music
+          for f in assets/music_src/*.mp3; do
+            name=$(basename "$f" .mp3)
+            # 32 kHz e agudos cortados: o som mais "quente" e abafado dos cartuchos de N64.
+            # loudnorm deixa todas as faixas no mesmo volume.
+            ffmpeg -loglevel error -y -i "$f" \
+              -af "loudnorm=I=-16:TP=-1.5,lowpass=f=12000,aresample=32000" \
+              -c:a libvorbis -q:a 2 "public/music/$name.ogg"
+          done
+          ls -la public/music
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public

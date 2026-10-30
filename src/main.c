@@ -48,6 +48,7 @@ static void UpdateDrawFrame(void)
     Soldiers_Update(&player, dt);
     Dummies_Update(dt);
     GameCamera_Update(&gameCamera, &player, dt);
+    Music_Update(Soldiers_Engaged(), dt);
 
     BeginDrawing();
     ClearBackground((Color){ 120, 170, 220, 255 });
@@ -59,7 +60,7 @@ static void UpdateDrawFrame(void)
         Player_Draw(&player);
     EndMode3D();
 
-    DrawText("Knight Game Project - Tarefa 5", 10, 10, 20, RAYWHITE);
+    DrawText("Knight Game Project - Tarefa 5 + som", 10, 10, 20, RAYWHITE);
     DrawText("Andar: setas/WASD ou analogico | Camera: Q/E ou analogico direito | Centralizar: C ou L1", 10, 34, 10, RAYWHITE);
     DrawText("Espada: J ou B (aperte 3x para o combo) | Escudo: segure K ou R1", 10, 48, 10, RAYWHITE);
     DrawText(TextFormat("Acertos: %d", Dummies_TotalHits()), SCREEN_W - 110, 10, 20, RAYWHITE);
@@ -78,6 +79,9 @@ static void UpdateDrawFrame(void)
 int main(void)
 {
     InitWindow(SCREEN_W, SCREEN_H, "Knight Game Project");
+    InitAudioDevice();
+    Sfx_Init();
+    Music_Init();
 
     World_Init();
     Dummies_Init();
@@ -92,6 +96,7 @@ int main(void)
     while (!WindowShouldClose()) UpdateDrawFrame();
 #endif
 
+    CloseAudioDevice();
     CloseWindow();
     return 0;
 }

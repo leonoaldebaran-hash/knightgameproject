@@ -116,7 +116,11 @@ static void UpdateSoldier(Soldier *s, Player *p, float dt)
             else
             {
                 s->vel = Vector3Zero();
-                if (fabsf(WrapAngle(toPlayer - s->angle)) < 25.0f*DEG2RAD) SetState(s, SOLDIER_WINDUP);
+                if (fabsf(WrapAngle(toPlayer - s->angle)) < 25.0f*DEG2RAD)
+                {
+                    SetState(s, SOLDIER_WINDUP);
+                    Sfx_Play(SFX_ALERT);
+                }
             }
             break;
 
@@ -124,7 +128,12 @@ static void UpdateSoldier(Soldier *s, Player *p, float dt)
             // Vira devagar enquanto prepara o golpe: dá para circular em volta dele
             s->vel = Vector3Zero();
             TurnTowards(s, toPlayer, TURN_SPEED*0.3f, dt);
-            if (s->timer >= WINDUP_TIME) { SetState(s, SOLDIER_STRIKE); s->struck = false; }
+            if (s->timer >= WINDUP_TIME)
+            {
+                SetState(s, SOLDIER_STRIKE);
+                s->struck = false;
+                Sfx_Play(SFX_SWING);
+            }
             break;
 
         case SOLDIER_STRIKE:
@@ -200,6 +209,17 @@ int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int at
         hits++;
     }
     return hits;
+}
+
+// Algum soldado está lutando com o jogador? (usado para trocar a música)
+bool Soldiers_Engaged(void)
+{
+    for (int i = 0; i < MAX_SOLDIERS; i++)
+    {
+        SoldierState st = soldiers[i].state;
+        if (st != SOLDIER_PATROL && st != SOLDIER_DEAD) return true;
+    }
+    return false;
 }
 
 Vector3 Soldiers_Collide(Vector3 pos, float radius)
