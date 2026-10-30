@@ -12,6 +12,10 @@ void Music_Init(void)
 
 void Music_Update(bool inBattle, float dt)
 {
+    // M ou Select liga e desliga a música
+    if (IsKeyPressed(KEY_M) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_LEFT)))
+        Synth_ToggleMute();
+
     // A mesma música do campo ganha tambores e metais quando um inimigo te persegue,
     // e eles saem devagar um pouco depois da luta, como no Ocarina
     if (inBattle) battleHold = BATTLE_HOLD;

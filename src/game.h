@@ -104,7 +104,10 @@ void Music_Update(bool inBattle, float dt);
 // Sintetizador e sequenciador no estilo N64 (synth.c)
 typedef enum {
     INST_STRINGS, INST_FLUTE, INST_BRASS, INST_HARP,
-    INST_BASS, INST_CHOIR, INST_BELL, INST_DRUMS, INST_COUNT
+    INST_BASS, INST_CHOIR, INST_BELL, INST_DRUMS,
+    INST_TIMPANI,    // tímpano de orquestra
+    INST_STACCATO,   // cordas curtas e marcadas, para ritmos rápidos
+    INST_COUNT
 } InstrumentId;
 
 typedef struct SongChannel {
@@ -125,6 +128,7 @@ void Synth_Init(void);
 void Synth_Play(const Song *song);
 void Synth_SetIntensity(float amount);
 void Synth_SetVolume(float volume);
+bool Synth_ToggleMute(void);   // retorna true se ficou mudo
 
 // Músicas compostas (songs.c)
 extern const Song SONG_FIELD;

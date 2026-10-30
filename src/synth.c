@@ -8,7 +8,7 @@
 #define TICKS_PER_BEAT  48      // resolução: 48 divisões por semínima
 #define MAX_CHANNELS    8
 #define MAX_EVENTS      1024
-#define MAX_VOICES      20
+#define MAX_VOICES      28
 #define KS_MAX          1200    // memória da corda dedilhada (nota mais grave ~27 Hz)
 #define BUFFER_FRAMES   1024
 
@@ -42,12 +42,14 @@ typedef struct InstrumentDef { float attack, decay, sustain, release, gain; } In
 static const InstrumentDef defs[INST_COUNT] = {
     [INST_STRINGS] = { 0.08f, 0.30f, 0.80f, 0.35f, 0.55f },
     [INST_FLUTE]   = { 0.05f, 0.10f, 0.90f, 0.15f, 0.50f },
-    [INST_BRASS]   = { 0.04f, 0.20f, 0.70f, 0.15f, 0.55f },
+    [INST_BRASS]   = { 0.03f, 0.25f, 0.85f, 0.15f, 0.65f },
     [INST_HARP]    = { 0.00f, 0.00f, 1.00f, 0.25f, 0.70f },
     [INST_BASS]    = { 0.01f, 0.30f, 0.60f, 0.08f, 0.70f },
     [INST_CHOIR]   = { 0.25f, 0.30f, 0.85f, 0.50f, 0.45f },
     [INST_BELL]    = { 0.00f, 0.00f, 1.00f, 0.80f, 0.40f },
     [INST_DRUMS]   = { 0.00f, 0.00f, 1.00f, 0.05f, 0.80f },
+    [INST_TIMPANI] = { 0.00f, 0.00f, 1.00f, 0.30f, 0.90f },
+    [INST_STACCATO]= { 0.005f, 0.08f, 0.45f, 0.06f, 0.50f },
 };
 
 static AudioStream stream;
@@ -61,6 +63,7 @@ static int tick = 0;
 static double tickAcc = 0.0;
 static unsigned int noiseState = 22222;
 static float masterVolume = 0.8f;
+static bool muted = false;
 static float layerTarget[2] = { 1.0f, 0.0f }, layerGain[2] = { 1.0f, 0.0f };
 
 // Eco simples (2 filtros pente + 1 passa-tudo): a "sala" típica das trilhas de N64
@@ -173,7 +176,7 @@ static void NoteOn(int channel, const NoteEvent *e)
     v->holdTime = e->length*60.0f/(bpm*TICKS_PER_BEAT);
     v->released = -1.0f;
     v->lp = v->lp2 = 0.0f;
-    v->drum = e->midi % 12;   // na bateria: c = bumbo, d = caixa, e/f = chimbal
+    v->drum = e->midi % 12;   // na bateria: c bumbo, d caixa, e/f chimbal, g tom, a prato
 
     if (v->instrument == INST_HARP)
     {
@@ -182,7 +185,8 @@ static void NoteOn(int channel, const NoteEvent *e)
         v->ksPos = 0;
         for (int i = 0; i < v->ksLen; i++) v->ks[i] = Noise();
     }
-    if (v->instrument == INST_DRUMS) v->holdTime = 0.3f;
+    if (v->instrument == INST_DRUMS) v->holdTime = (v->drum >= 9) ? 1.6f : 0.4f;   // o prato soa longo
+    if (v->instrument == INST_TIMPANI) v->holdTime = fmaxf(v->holdTime, 1.2f);
 }
 
 static float Envelope(Voice *v)
@@ -229,14 +233,33 @@ static float RenderVoice(Voice *v)
             out = tone + v->lp;
         } break;
 
-        case INST_BRASS:     // dente de serra com filtro que abre no ataque
+        case INST_BRASS:     // naipe de metais: 3 dentes de serra desafinadas, filtro que "rasga" no ataque
         {
-            float p = Advance(&v->phase[0], v->freq*vib);
-            float saw = 2.0f*p - 1.0f;
-            float cutoff = 0.06f + 0.4f*fminf(1.0f, t/0.08f)*expf(-t*2.0f);
+            const float detune[3] = { 0.994f, 1.0f, 1.006f };
+            float saw = 0.0f;
+            for (int k = 0; k < 3; k++) saw += 2.0f*Advance(&v->phase[k], v->freq*vib*detune[k]) - 1.0f;
+            saw *= 0.45f;
+            float cutoff = 0.16f + 0.45f*fminf(1.0f, t/0.04f)*expf(-t*3.0f);
             v->lp += (saw - v->lp)*cutoff;
             v->lp2 += (v->lp - v->lp2)*cutoff;
-            out = v->lp2*1.5f;
+            out = tanhf(v->lp2*2.2f);   // leve saturação: som de metal soprado com força
+        } break;
+
+        case INST_STACCATO:  // cordas curtas: dente de serra brilhante
+        {
+            float a = Advance(&v->phase[0], v->freq*0.998f);
+            float b = Advance(&v->phase[1], v->freq*1.002f);
+            float saw = (a + b) - 1.0f;
+            v->lp += (saw - v->lp)*0.35f;
+            out = v->lp;
+        } break;
+
+        case INST_TIMPANI:   // tímpano: tom grave que cai um pouco, com batida de ruído
+        {
+            float p = Advance(&v->phase[0], v->freq*(1.0f + 0.08f*expf(-t*20.0f)));
+            float q = Advance(&v->phase[1], v->freq*1.5f);
+            float body = (sinf(2.0f*PI*p) + 0.3f*sinf(2.0f*PI*q))*expf(-t*2.2f);
+            out = body*1.3f + Noise()*expf(-t*40.0f)*0.4f;
         } break;
 
         case INST_HARP:
@@ -282,11 +305,22 @@ static float RenderVoice(Voice *v)
                 float p = Advance(&v->phase[0], 185.0f);
                 out = (Noise()*0.8f + sinf(2.0f*PI*p)*0.5f)*expf(-t*18.0f);
             }
-            else                       // chimbal: ruído agudo bem curto
+            else if (v->drum <= 5)     // chimbal: ruído agudo bem curto
             {
                 float n = Noise();
                 v->lp += (n - v->lp)*0.5f;
                 out = (n - v->lp)*expf(-t*45.0f)*0.6f;
+            }
+            else if (v->drum <= 8)     // tom: tambor grave de guerra
+            {
+                float p = Advance(&v->phase[0], Lerp(80.0f, 130.0f, expf(-t*15.0f)));
+                out = (sinf(2.0f*PI*p)*1.2f + Noise()*0.2f*expf(-t*30.0f))*expf(-t*7.0f);
+            }
+            else                       // prato: ruído brilhante que soa longo
+            {
+                float n = Noise();
+                v->lp += (n - v->lp)*0.6f;
+                out = (n - v->lp)*expf(-t*2.5f)*0.55f;
             }
             break;
     }
@@ -372,7 +406,7 @@ static void SynthCallback(void *buffer, unsigned int frames)
             }
             mix += Reverb(mix*0.5f)*0.35f;
         }
-        mix = tanhf(mix*masterVolume*0.6f);   // limita o volume sem estourar
+        mix = tanhf(mix*(muted ? 0.0f : masterVolume)*0.6f);   // limita o volume sem estourar
         out[i] = (short)(mix*30000.0f);
     }
 }
@@ -421,4 +455,10 @@ void Synth_SetIntensity(float amount)
 void Synth_SetVolume(float volume)
 {
     masterVolume = volume;
+}
+
+bool Synth_ToggleMute(void)
+{
+    muted = !muted;
+    return muted;
 }
