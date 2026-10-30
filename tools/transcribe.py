@@ -124,6 +124,86 @@ def transcribe(track):
     print(f"== {track}: pronto", flush=True)
 
 
+MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+
+
+def estimate_key(notes):
+    weights = np.zeros(12)
+    for start, end, midi, _ in notes:
+        weights[midi % 12] += end - start
+    best = (-2.0, "")
+    for i in range(12):
+        for profile, mode in ((MAJOR, "maior"), (MINOR, "menor")):
+            corr = np.corrcoef(np.roll(profile, i), weights)[0, 1]
+            if corr > best[0]:
+                best = (corr, f"{NAMES[i]} {mode}")
+    return best[1]
+
+
+def transcribe_voice(path):
+    """Melodia cantada ou cantarolada: uma voz só, então não precisa separar instrumentos."""
+    name = os.path.splitext(os.path.basename(path))[0]
+    print(f"== {name}: notas da voz", flush=True)
+    _, midi, events = predict(path, ICASSP_2022_MODEL_PATH)
+    os.makedirs(MIDI_OUT, exist_ok=True)
+    midi.write(os.path.join(MIDI_OUT, f"{name}.mid"))
+
+    # Notas firmes e não muito curtas, uma de cada vez (a voz é uma linha só)
+    notes = sorted((e[0], e[1], int(e[2]), float(e[3])) for e in events if e[3] > 0.3 and e[1] - e[0] > 0.07)
+    mono = []
+    for n in notes:
+        if mono and n[0] < mono[-1][1]:
+            # Sobreposição: fica a nota mais forte
+            if n[3] > mono[-1][3]:
+                mono[-1] = (mono[-1][0], n[0], mono[-1][2], mono[-1][3])
+                if mono[-1][1] - mono[-1][0] < 0.07:
+                    mono.pop()
+                mono.append(n)
+            continue
+        mono.append(n)
+
+    y, sr = librosa.load(path, sr=22050, mono=True)
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+    tempo = float(np.atleast_1d(tempo)[0])
+    onsets = np.diff([n[0] for n in mono])
+    pulse = float(np.median(onsets)) if len(onsets) else 0.0
+
+    lines = [
+        f"# Transcrição da voz: {name}",
+        "",
+        f"Arquivo: `{path}` · duração {len(y) / sr:.0f} s · {len(mono)} notas",
+        f"Tom provável: **{estimate_key(mono)}** · andamento medido: ~{tempo:.0f} BPM · "
+        f"intervalo mais comum entre notas: {pulse:.2f} s",
+        "",
+        "Gerado por `tools/transcribe.py` (Basic Pitch). Frases separadas por pausas de mais de 0,6 s.",
+        "Formato: `nota(duração em segundos)`, e `·0.4` é uma pausa curta dentro da frase.",
+        "",
+    ]
+    phrase, phrase_no = [], 1
+    for i, (start, end, note, _) in enumerate(mono):
+        gap = start - mono[i - 1][1] if i else 0.0
+        if phrase and gap > 0.6:
+            lines.append(f"**Frase {phrase_no}** ({phrase[0][0]:.1f} s): " + " ".join(p[1] for p in phrase))
+            lines.append("")
+            phrase, phrase_no = [], phrase_no + 1
+        token = f"{note_name(note)}({end - start:.2f})"
+        if phrase and gap > 0.12:
+            token = f"·{gap:.1f} " + token
+        phrase.append((start, token))
+    if phrase:
+        lines.append(f"**Frase {phrase_no}** ({phrase[0][0]:.1f} s): " + " ".join(p[1] for p in phrase))
+
+    os.makedirs(DOC_OUT, exist_ok=True)
+    with open(os.path.join(DOC_OUT, f"{name}.md"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"== {name}: pronto", flush=True)
+
+
 if __name__ == "__main__":
     for name in sys.argv[1:]:
-        transcribe(name)
+        # Um caminho de arquivo é uma gravação de voz; um nome é uma faixa de assets/music_src
+        if os.path.isfile(name):
+            transcribe_voice(name)
+        else:
+            transcribe(name)

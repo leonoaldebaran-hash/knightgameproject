@@ -3,11 +3,11 @@ name: Transcrever músicas
 on:
   push:
     branches: [main]
-    paths: ['tools/transcribe.py', '.github/workflows/transcribe.yml']
+    paths: ['assets/hum/**']
   workflow_dispatch:
     inputs:
       tracks:
-        description: 'Faixas (nomes em assets/music_src, separados por espaço)'
+        description: 'Faixas de assets/music_src (nome) ou gravações de voz (caminho), separadas por espaço'
         default: 'after_future'
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
       - name: Transcrever
         run: |
           mkdir -p docs/transcricao
-          python tools/transcribe.py ${{ github.event.inputs.tracks || 'after_future' }} 2>&1 | tee docs/transcricao/log.txt
+          python tools/transcribe.py ${{ github.event.inputs.tracks || 'assets/hum/*' }} 2>&1 | tee docs/transcricao/log.txt
 
       - name: Salvar o resultado no repositório
         if: always()
