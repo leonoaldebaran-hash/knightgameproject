@@ -204,15 +204,47 @@ Uma cidade murada no centro de Pangea, com mercado, castelo, praças e ruas estr
 - **No jogo:** Aion é a espada principal a partir dali, necessária para ferir os Guardiões a partir do Templo da Água e para romper as barreiras de Cronos.
 - **No clímax:** na batalha a cavalo, Kairós usa a lâmina gêmea, escura, que ele forjou após ser corrompido.
 
-## 8. Inimigos
+## 8. Estética e sensação (estilo N64 / Ocarina of Time)
+Objetivo: a mesma *sensação* de Ocarina of Time — visual, movimento, animação e som — com **assets 100% originais**. Estilo e mecânicas podem ser imitados; modelos, texturas, sons, músicas e mapas do jogo original **não** podem ser copiados.
+
+### Visual
+- Modelos low-poly com formas simples e silhuetas fortes.
+- **Cor por vértice** para luz e sombra pintadas (cavernas escuras, cantos sombreados), em vez de iluminação dinâmica pesada.
+- Texturas pequenas (32×32 a 64×64, no máximo 128×128), com **filtro bilinear** suave e cores levemente dessaturadas, puxando para o clima de Twilight Princess.
+- Texturas repetidas (tiling) em paredes e chão, e decalques para detalhes.
+- **Névoa colorida** por área: azulada no campo, alaranjada no vulcão, esverdeada na floresta.
+- Céu com gradiente e um ciclo de dia e noite simples.
+- Personagens com rosto e olhos pintados na textura, sem geometria detalhada.
+- Fundos pré-renderizados ou câmera fixa em lugares especiais, como as lojas de Thalassa.
+
+### Movimento (o "peso" do jogo)
+Os valores serão ajustados comparando gravações frame a frame do Ship of Harkinian com o nosso jogo:
+- Andar e correr com aceleração curta: o personagem responde rápido mas tem um pouco de inércia.
+- **Pulo automático** ao correr até uma borda, sem botão de pulo.
+- Rolamento, escalada automática de degraus baixos e agarrar bordas.
+- Mira travada que deixa o jogador andar em volta do inimigo e saltar para os lados e para trás.
+- Combate com combo de 3 golpes, golpe giratório carregado e defesa com escudo.
+
+### Animação
+- Esqueleto simples, com **cada vértice preso a um único osso** (estilo de "peças rígidas" do N64), o que é barato para o R36S.
+- Poucas poses-chave, com transição suave entre animações.
+- Gestos exagerados e legíveis: antecipação antes do golpe e recuo depois dele.
+
+### Som e música
+- Efeitos curtos com um leve "crocante" de baixa taxa de amostragem (cerca de 22–32 kHz).
+- Músicas **sequenciadas** (estilo MIDI com instrumentos sampleados) e em loop, como no N64. Isso ocupa pouca memória e permite trocar faixas por área.
+- Temas curtos e memoráveis para cada lugar, além de vinhetas para baú aberto, item obtido, segredo descoberto e puzzle resolvido.
+- Ambiência por área: vento, água corrente, lava borbulhando.
+
+## 9. Inimigos
 - Somente humanos de armadura (soldados, arqueiros, cavaleiros pesados, guardiões).
 - Armaduras com design inspirado no estilo de Cavaleiros do Zodíaco, sem copiar designs existentes.
 
-## 9. Trilha sonora
+## 10. Trilha sonora
 - Orquestra épica + coral + guitarra no estilo anos 80, no clima de Cavaleiros do Zodíaco e Ocarina of Time.
 - Composições originais (geradas com IA); não reproduzir melodias existentes.
 
-## 10. Pendências
+## 11. Pendências
 - [ ] Nomes dos 8 Guardiões Titânicos
 - [ ] Design visual de Mateo, Johana, Kairós e Aurel
 - [ ] Design de cada peça da armadura suprema
