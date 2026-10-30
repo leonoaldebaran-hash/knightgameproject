@@ -13,6 +13,7 @@ import sys
 
 import librosa
 import numpy as np
+from basic_pitch import ICASSP_2022_MODEL_PATH
 from basic_pitch.inference import predict
 
 SRC = "assets/music_src"
@@ -81,7 +82,7 @@ def transcribe(track):
     for stem in STEMS:
         wav = os.path.join(SEP, "htdemucs", track, f"{stem}.wav")
         print(f"== {track}: notas de {stem}", flush=True)
-        _, midi, events = predict(wav)
+        _, midi, events = predict(wav, ICASSP_2022_MODEL_PATH)
         midi.write(os.path.join(MIDI_OUT, f"{track}_{stem}.mid"))
         # (início, fim, nota MIDI, força); descarta notas muito fracas
         stem_notes[stem] = [(e[0], e[1], int(e[2]), float(e[3])) for e in events if e[3] > 0.35]

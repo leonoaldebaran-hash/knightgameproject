@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install torch==2.1.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
-          pip install demucs==4.0.1 basic-pitch==0.3.0 librosa==0.10.2.post1 "numpy<2" soundfile
+          pip install demucs==4.0.1 "basic-pitch[onnx]==0.3.0" librosa==0.10.2.post1 "numpy<2" soundfile
 
       - name: Transcrever
         run: |
