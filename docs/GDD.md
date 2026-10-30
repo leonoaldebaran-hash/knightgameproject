@@ -246,15 +246,21 @@ Os valores serão ajustados comparando gravações frame a frame do Ship of Hark
 - **Base da trilha:** músicas compostas pelo autor do jogo com IA (álbuns *After Image*). Os arquivos originais ficam em `assets/music_src/` e o build converte para OGG no estilo N64 (32 kHz, agudos suavizados, volume igualado).
 - Novas faixas e variações por lugar e clima são geradas a partir dessas, mantendo o mesmo tema.
 
-| Faixa | Uso planejado |
-|---|---|
-| Get Ready | Tela título |
-| Boas vindas primavera | Black Waters Village |
-| After Future | Campo de Pangea *(em uso)* |
-| Paganini Fist | Combate *(em uso)* |
-| Ember Heart (partes 1 a 3) | Templo do Fogo: exploração, mini-chefe e chefe |
-| Crimson Sky Requiem | Tema de Kairós e momentos sombrios |
-| Bubbles | Templo da Água (cachoeiras e tobogãs) |
+Distribuição baseada nas medições de [MUSICA_ANALISE.md](MUSICA_ANALISE.md) (andamento, tom, energia, brilho) e nos nomes das faixas:
+
+| Faixa | Medição | Uso planejado | Por quê |
+|---|---|---|---|
+| Get Ready | Fá menor, ~172 BPM, energia no começo | Tela título e abertura | Começa forte e vai esvaziando: abertura que "chama" para a aventura |
+| Boas vindas primavera | Ré maior, ~108 BPM, timbre quente, muito melódica | Black Waters Village | Tom maior e som suave: lar, infância, Johana |
+| After Future | Fá# menor, ~103 BPM, a mais rítmica de todas | Campo de Pangea *(em uso)* | Ritmo de caminhada constante e clima melancólico de mundo pós-apocalipse |
+| Paganini Fist | Lá menor, ~152 BPM, cresce até o fim | Combate *(em uso)* | Rápida e tensa |
+| Ember Heart | Dó maior, brilhante, crescendo do início ao fim | Tema heroico: peça da armadura obtida, cavalgadas | Tom maior que vai crescendo: sensação de conquista |
+| Ember Heart parte 2 | Lá menor, ~83 BPM, brilhante, energia alta | Templo do Fogo: exploração | Pesada e intensa, em tom menor |
+| Ember Heart parte 3 | Dó menor, ~83 BPM, cresce até o fim | Templo do Fogo: Guardião Titânico | Termina no ápice, bom para chefe |
+| Crimson Sky Requiem | Dó menor, ~161 BPM, escura | Kairós e momentos sombrios | Rápida, escura e dramática |
+| Bubbles | Ré maior, ~117 BPM, a mais melódica, clímax no fim | Templo da Água (cachoeiras e tobogãs) | Fluida e quase sem percussão |
+
+**Faixas que ainda faltam** (variações a gerar com o mesmo tema): Thalassa (festiva), Gaia, templos da Terra, Ar, Sombras, Luz, Caos e Ordem, tema da Johana/Reia, Hespérios e Aion, Cronos e o final épico.
 
 ## 11. Pendências
 - [ ] Nomes dos 8 Guardiões Titânicos
