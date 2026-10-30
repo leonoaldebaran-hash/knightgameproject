@@ -17,7 +17,18 @@
   <script>
     var Module = { canvas: document.getElementById('canvas') };
     document.getElementById('canvas').addEventListener('click', function () { this.focus(); });
+
+    // A página pode vir do cache do navegador; o version.json é sempre buscado de novo
+    // e diz qual arquivo do jogo é o atual. Assim nunca carregamos uma versão que já não existe.
+    function loadGame(file) {
+      var s = document.createElement('script');
+      s.src = file;
+      document.body.appendChild(s);
+    }
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (v) { loadGame(v.js); })
+      .catch(function () { loadGame('__GAME_JS__'); });
   </script>
-  <script src="__GAME_JS__"></script>
 </body>
 </html>

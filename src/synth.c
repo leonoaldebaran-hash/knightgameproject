@@ -296,10 +296,14 @@ static float RenderChoir(Voice *v)
     }
     src = src*0.25f + Noise()*0.05f;
 
+    // Coeficientes dos filtros calculados uma vez só (isto roda para cada amostra de som)
+    static float coef[3] = { 0 };
+    if (coef[0] == 0.0f) for (int k = 0; k < 3; k++) coef[k] = 2.0f*sinf(PI*formants[k]/SYNTH_RATE);
+
     float out = 0.0f;
     for (int k = 0; k < 3; k++)
     {
-        float f = 2.0f*sinf(PI*formants[k]/SYNTH_RATE);
+        float f = coef[k];
         float high = src - v->lowA[k] - 0.25f*v->bandA[k];
         v->bandA[k] += f*high;
         v->lowA[k] += f*v->bandA[k];

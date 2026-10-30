@@ -50,6 +50,7 @@ jobs:
             -Iraylib/src -DPLATFORM_WEB -DGAME_VERSION="\"$VERSION\"" -DSOUNDBANK_FILE="\"$BANK\"" \
             -s USE_GLFW=3 -s ALLOW_MEMORY_GROWTH=1
           sed "s/__GAME_JS__/game-$VERSION.js/" web/index.html > public/index.html
+          echo "{\"js\": \"game-$VERSION.js\"}" > public/version.json
 
       - uses: actions/upload-pages-artifact@v3
         with:
