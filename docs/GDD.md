@@ -60,6 +60,7 @@
 ### Claude — o ferreiro
 - Amigo de infância e rival de Mateo.
 - Forja as melhorias de equipamento ao longo do jogo.
+- O nome é uma homenagem ao Claude, a IA que ajuda a forjar este jogo.
 
 ### Outros *(provisório)*
 - **Astra:** a égua de Mateo.
@@ -123,15 +124,95 @@ O mundo antigo, submerso, revelado quando as águas baixam. Contém os biomas e 
 
 Chefes: os **8 Guardiões Titânicos**, cavaleiros de Cronos com armaduras temáticas de constelação e elemento (designs originais).
 
-## 7. Inimigos
+### Design de dungeons (fortemente inspirado em Ocarina of Time)
+Cada templo segue a mesma espinha dorsal:
+1. **Entrada com desafio de acesso** — exige um item de um templo anterior ou uma habilidade do overworld.
+2. **Salas com chaves pequenas** — portas trancadas, baús escondidos, inimigos que precisam ser derrotados para abrir a sala.
+3. **Mapa e Astrolábio** — o mapa mostra as salas; o Astrolábio (equivalente à bússola) mostra baús e a posição do chefe.
+4. **Mini-chefe** — um cavaleiro de elite que guarda o **item obrigatório** do templo.
+5. **Segunda metade usa o item** — o item abre caminhos que antes eram impossíveis, e a dungeon "se reorganiza" na cabeça do jogador.
+6. **Selo do Guardião** (chave do chefe) — em um baú grande, no fim de um puzzle maior.
+7. **Chefe** — o Guardião Titânico, cujo ponto fraco exige o item do templo.
+8. **Recompensa** — peça da armadura suprema + Fragmento de Vida completo (aumenta a vida).
+
+Elementos de puzzle recorrentes: blocos para empurrar e puxar, interruptores de pressão, tochas para acender, alvos de olho para acertar com flecha, salas que só abrem após derrotar todos os inimigos, plataformas móveis, paredes rachadas, níveis de água variáveis, espelhos de luz, salas de ilusão e paredes falsas.
+
+| Templo | Assinatura de puzzle |
+|---|---|
+| Terra | Blocos gigantes, pilares para esmagar com o martelo, plataformas que afundam |
+| Ar | Correntes de vento, pontes suspensas, alvos distantes para o arco |
+| Fogo | Lava que sobe e desce, muros rachados para bombas, tochas com tempo |
+| Água | Três níveis de água controlados por torres; mergulho com a máscara |
+| Sombras | Paredes invisíveis e salas de ilusão, alvos de gancho no escuro |
+| Luz | Espelhos e feixes de luz, lanças explosivas em cristais; puzzles em dupla com Aurel |
+| Caos | Gravidade e salas que giram; botas de ferro para andar onde tudo desmorona |
+| Ordem | Puzzles de padrão e simetria, salas espelhadas; planar entre torres |
+
+## 7. Pangea: overworld, capital e povos
+
+### Overworld
+O mundo é dividido em zonas carregadas separadamente (como em OoT), com névoa à distância para caber no orçamento do R36S.
+
+| Região | Descrição | Para cavalgar |
+|---|---|---|
+| Planície de Pangea | Campo central que liga tudo, com ruínas e árvores solitárias; ciclo de dia e noite | Grande área aberta, o "Hyrule Field" do jogo |
+| Pradaria Dourada | Campos de trigo e moinhos ao pôr do sol | Estradas longas e cercas para saltar |
+| Costa de Coral | Praias de areia branca e falésias sobre o mar | Galope pela areia na beira d'água |
+| Vale dos Ventos | Desfiladeiros com cachoeiras e arcos naturais de pedra | Trilhas sinuosas e pontes |
+| Black Waters Village | Vilarejo natal, à beira de um lago cristalino | — |
+
+Em Gaia, cada bioma dos templos tem sua própria área de exploração.
+
+### A capital: Thalassa
+*"Thalassa" significa "mar" em grego — a cidade foi erguida pelos sobreviventes do apocalipse aquático, embora ninguém saiba mais disso.*
+
+Uma cidade murada no centro de Pangea, com mercado, castelo, praças e ruas estreitas. Atividades:
+- **Galeria de tiro com arco** — prêmio: aljava maior.
+- **Boliche de bombas** — prêmio: bolsa de bombas maior.
+- **Jogo dos baús** — escolher o baú certo com sorte e memória.
+- **Arena dos Cavaleiros** — torneio de combate em rodadas contra soldados de armadura.
+- **Hipódromo** — corridas a cavalo com Astra.
+- **Lagoa de pesca** — minigame de pesca, com um peixe lendário.
+- **Biblioteca das Lendas** — onde se entregam os Fragmentos de Lenda coletados; cada coleção desbloqueia um trecho da verdadeira história do mundo.
+- **Lojas** — mercado de poções, equipamentos e itens; a mercadora Nyx aparece aqui à noite.
+- **Missões de moradores** — o cão perdido, a criança que quer ser cavaleira, o guarda que perdeu a chave, a troca de itens em cadeia.
+
+### Coletáveis e extras
+- **Fragmentos de Vida** — 4 formam um coração extra; escondidos no mundo e em minigames.
+- **Escamas do Tempo** — 100 escamas douradas espalhadas pelo mundo e pelos templos, com recompensas a cada 10 (estilo Gold Skulltulas).
+- **Fragmentos de Lenda** — pedras gravadas com lendas antigas, entregues na Biblioteca de Thalassa.
+- **Frascos** — guardam poções, água e outros itens.
+- **Lira de Calíope** *(provisório)* — instrumento entregue pela Vó Copélia; melodias abrem passagens, chamam Astra e mudam o clima.
+- **Grutas secretas** — cavernas escondidas sob pedras e paredes rachadas.
+
+### Povos de Pangea
+| Povo | Onde vivem | Cultura |
+|---|---|---|
+| Thalassianos | Thalassa | Comerciantes e soldados; a guarda real veste armaduras de bronze |
+| Litos | Cânions de pedra | Mineiros e escultores; esculpem as lendas em pedra; guiam até o Templo da Terra |
+| Aerídeos | Montanhas do Vale dos Ventos | Nômades falcoeiros que vivem em tendas penduradas nos penhascos |
+| Pírricos | Encostas do vulcão | Ferreiros de forja sagrada; Claude aprende técnicas com eles |
+| Marinheiros de Nereu | Costa de Coral | Pescadores e mergulhadores; ensinam a ler as marés |
+| **Hespérios** | Falésias do extremo oeste, isolados do mundo | Ver abaixo |
+
+### Os Hespérios e a espada ancestral Aion
+- Povo isolado no extremo oeste de Pangea, onde o sol se põe. Não deixam estrangeiros entrar e falam uma língua antiga.
+- Guardam **Aion**, uma espada ancestral cravada em pedra num santuário. *Aion*, na mitologia grega, é o tempo eterno e sem fim — o oposto do tempo que devora (Cronos).
+- Ninguém nunca conseguiu empunhá-la. A lenda dos Hespérios diz: *"Aion só aceita quem já morreu uma vez."*
+- **Quando:** após o Templo do Fogo (3º). Mateo precisa conquistar a confiança dos Hespérios com uma missão própria.
+- **Por que Mateo consegue:** ele é a reencarnação do primeiro Mateo, que empunhou Aion no ciclo anterior. A anciã hespéria diz *"Ela já te conhecia"* — uma pista do plot twist muito antes da revelação.
+- **No jogo:** Aion é a espada principal a partir dali, necessária para ferir os Guardiões a partir do Templo da Água e para romper as barreiras de Cronos.
+- **No clímax:** na batalha a cavalo, Kairós usa a lâmina gêmea, escura, que ele forjou após ser corrompido.
+
+## 8. Inimigos
 - Somente humanos de armadura (soldados, arqueiros, cavaleiros pesados, guardiões).
 - Armaduras com design inspirado no estilo de Cavaleiros do Zodíaco, sem copiar designs existentes.
 
-## 8. Trilha sonora
+## 9. Trilha sonora
 - Orquestra épica + coral + guitarra no estilo anos 80, no clima de Cavaleiros do Zodíaco e Ocarina of Time.
 - Composições originais (geradas com IA); não reproduzir melodias existentes.
 
-## 9. Pendências
+## 10. Pendências
 - [ ] Nomes dos 8 Guardiões Titânicos
 - [ ] Design visual de Mateo, Johana, Kairós e Aurel
 - [ ] Design de cada peça da armadura suprema
