@@ -1,9 +1,9 @@
-Trompas: 8 arquivos
-  -> C2, G2, D3, A3
+Trompas: 29 arquivos
+  -> A1, D♯2, G2, D3, A3, D5
 Trompetes: 10 arquivos
   -> F3, A3, D♯4, G4, D5, A5
-Trombones: 9 arquivos
-  -> D♯2, A♯2, D3, C4, F4
+Trombones: 31 arquivos
+  -> A♯1, D♯2, A♯2, D3, C4, F4
 Tuba: 23 arquivos
   -> F1, A♯1, D♯2, A♯2, D3, A♯3
 Violinos: 11 arquivos
@@ -17,7 +17,7 @@ Violoncelos curtos: 52 arquivos
 Contrabaixo: 26 arquivos
   -> F♯1, A♯1, D2, F♯2, C♯3, G♯3
 Harpa: 23 arquivos
-  -> E1, B1, F2, A2, E3, B3, F4, A4
+  -> E2, B2, F3, A3, E4, B4, F5, A5
 Flauta: 13 arquivos
   -> C4, E4, A4, E5, A5, E6, A6
 Oboé: 18 arquivos
@@ -25,9 +25,9 @@ Oboé: 18 arquivos
 Ocarina: 10 arquivos
   -> A4, C♯5, F♯5, A♯5
 Glockenspiel: 6 arquivos
-  -> G5, C6, G6, C7
+  -> G5, C6, G6, C7, G7, C8
 Tímpanos: 5 arquivos
-  -> F♯1, A♯1, E2
+  -> F♯2, A♯2, E3
 Caixa marcial: 17 arquivos
   -> (percussão)
 Bumbo de orquestra: 39 arquivos
@@ -36,6 +36,6 @@ Pratos: 7 arquivos
   -> (percussão)
 Tambor de guerra: 5 arquivos
   -> (percussão)
-Gongo: 0 arquivos
+Gongo: 29 arquivos
   -> (percussão)
-Banco salvo: 12.3 MB
+Banco salvo: 13.2 MB
