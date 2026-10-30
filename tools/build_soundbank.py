@@ -32,9 +32,9 @@ REPOS = {"VSCO": ("sgossner/VSCO-2-CE", "master"), "VCSL": ("sgossner/VCSL", "ma
 # (nome, repo, pasta, filtro no nome do arquivo, sem altura?, duração máxima em s, máximo de amostras)
 # A ordem é a mesma do enum InstrumentId em src/game.h.
 INSTRUMENTS = [
-    ("Trompas",          "VSCO", "Brass/F Horn/sus",                         r"_v3_",      False, 2.6, 7),
+    ("Trompas",          "VSCO", "Brass/F Horn/sus",                         r"",          False, 2.6, 7),
     ("Trompetes",        "VSCO", "Brass/Trumpet/sus",                        r"_v3_",      False, 2.6, 7),
-    ("Trombones",        "VSCO", "Brass/Tenor Trombone/sus",                 r"_v3_",      False, 2.6, 7),
+    ("Trombones",        "VSCO", "Brass/Tenor Trombone/sus",                 r"",          False, 2.6, 7),
     ("Tuba",             "VSCO", "Brass/Tuba/sus",                           r"",          False, 2.6, 6),
     ("Violinos",         "VSCO", "Strings/Violin Section/susVib",            r"_v2",       False, 2.6, 8),
     ("Violinos curtos",  "VSCO", "Strings/Violin Section/Spic",              r"_v2_rr1",   False, 0.8, 8),
@@ -51,8 +51,35 @@ INSTRUMENTS = [
     ("Bumbo de orquestra", "VSCO", "VSCO 1 Percussion/drums/bass",           r"",          True,  1.4, 1),
     ("Pratos",           "VSCO", "VSCO 1 Percussion/varMetal/Cymbals/clash", r"",          True,  2.5, 1),
     ("Tambor de guerra", "VSCO", "VSCO 1 Percussion/drums/other/ethnic/giant/mallet", r"", True,  1.5, 1),
-    ("Gongo",            "VSCO", "VSCO 1 Percussion/varMetal/Gong/gong",     r"",          True,  3.0, 1),
+    ("Gongo",            "VSCO", "VSCO 1 Percussion/varMetal/Gong",          r"",          True,  3.0, 1),
 ]
+
+# As bibliotecas nomeiam as notas com o dó central como C3 (padrão Yamaha):
+# somando uma oitava chega-se ao padrão MIDI usado no jogo (dó central = C4 = 60).
+NAME_OCTAVE_FIX = 12
+# Nos tímpanos a fundamental é fraca e o medidor pega uma oitava abaixo
+MEASURE_FIX = {"Tímpanos": 12}
+
+
+def name_to_midi(filename):
+    m = re.search(r"_([A-G]#?)(-?\d)(?=[_.])", filename)
+    return librosa.note_to_midi(m.group(1) + m.group(2)) + NAME_OCTAVE_FIX if m else None
+
+
+def velocity(filename):
+    m = re.search(r"_v(\d)", filename)
+    return int(m.group(1)) if m else 0
+
+
+def pick_loudest_per_note(files):
+    """Uma gravação por nota: a mais forte disponível (tocar forte soa mais épico)."""
+    best = {}
+    for path in files:
+        key = name_to_midi(os.path.basename(path))
+        key = key if key is not None else path
+        if key not in best or velocity(os.path.basename(path)) > velocity(os.path.basename(best[key])):
+            best[key] = path
+    return sorted(best.values())
 
 
 def api_tree(repo, branch):
@@ -104,12 +131,26 @@ def main():
                        if p.lower().endswith(".wav") and os.path.dirname(p) == folder and re.search(pattern, os.path.basename(p)))
         print(f"{name}: {len(files)} arquivos", flush=True)
 
+        if not unpitched:
+            files = pick_loudest_per_note(files)
+
         samples = []
         for path in files[: 1 if unpitched else 40]:
             y = download(repo, branch, path)
-            root = 60.0 if unpitched else measure_pitch(y)
-            if root is None:
-                continue
+            if unpitched:
+                root = 60.0
+            else:
+                # A nota do nome do arquivo manda; a medição só faz o ajuste fino de afinação
+                named = name_to_midi(os.path.basename(path))
+                measured = measure_pitch(y)
+                if measured is not None:
+                    measured += MEASURE_FIX.get(name, 0)
+                if named is not None and measured is not None and abs(measured - named) <= 0.7:
+                    root = measured
+                else:
+                    root = named if named is not None else measured
+                if root is None:
+                    continue
             samples.append((root, prepare(y, max_s)))
 
         # Fica com notas espalhadas pela extensão do instrumento, sem repetir regiões
