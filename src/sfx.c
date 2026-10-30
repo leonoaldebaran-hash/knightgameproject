@@ -102,8 +102,40 @@ static Sound SynthAlert(void)
     return MakeSound(n);
 }
 
+// Vozes: só gritinhos e grunhidos, como no N64 (o diálogo é todo em texto).
+// Uma onda com o tom da voz passa por dois filtros que imitam a boca formando a vogal.
+static Sound SynthVoice(float duration, float pitchStart, float pitchEnd, float formant1, float formant2, float rough)
+{
+    int n = (int)(duration*SFX_RATE);
+    float phase = 0.0f;
+    float low1 = 0.0f, band1 = 0.0f, low2 = 0.0f, band2 = 0.0f;
+    float f1 = 2.0f*sinf(PI*formant1/SFX_RATE), f2 = 2.0f*sinf(PI*formant2/SFX_RATE);
+
+    for (int i = 0; i < n; i++)
+    {
+        float t = (float)i/n;
+        phase += Lerp(pitchStart, pitchEnd, t)/SFX_RATE;
+        if (phase >= 1.0f) phase -= 1.0f;
+        float source = (2.0f*phase - 1.0f) + Noise()*rough;
+
+        float high1 = source - low1 - 0.3f*band1;
+        band1 += f1*high1;
+        low1 += f1*band1;
+        float high2 = source - low2 - 0.4f*band2;
+        band2 += f2*high2;
+        low2 += f2*band2;
+
+        float env = fminf(1.0f, t*12.0f)*(1.0f - t)*(1.0f - t);
+        buffer[i] = ToSample((band1 + 0.6f*band2)*env*0.5f);
+    }
+    return MakeSound(n);
+}
+
 void Sfx_Init(void)
 {
+    sounds[SFX_VOICE_ATTACK] = SynthVoice(0.16f, 230.0f, 170.0f, 750.0f, 1150.0f, 0.15f);   // "rá!"
+    sounds[SFX_VOICE_HURT] = SynthVoice(0.22f, 270.0f, 150.0f, 500.0f, 900.0f, 0.25f);      // "uh!"
+    sounds[SFX_VOICE_ENEMY] = SynthVoice(0.24f, 120.0f, 95.0f, 600.0f, 1000.0f, 0.4f);      // "hrr!"
     sounds[SFX_SWING] = SynthSwing();
     sounds[SFX_HIT] = SynthHit();
     sounds[SFX_BLOCK] = SynthBlock();

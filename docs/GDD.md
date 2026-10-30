@@ -243,8 +243,10 @@ Os valores serão ajustados comparando gravações frame a frame do Ship of Hark
 ## 10. Trilha sonora
 - Orquestra épica + coral + guitarra no estilo anos 80, no clima de Cavaleiros do Zodíaco e Ocarina of Time.
 - Composições originais (geradas com IA); não reproduzir melodias existentes.
-- **Base da trilha:** músicas compostas pelo autor do jogo com IA (álbuns *After Image*). Os arquivos originais ficam em `assets/music_src/` e o build converte para OGG no estilo N64 (32 kHz, agudos suavizados, volume igualado).
-- Novas faixas e variações por lugar e clima são geradas a partir dessas, mantendo o mesmo tema.
+- **Música sequenciada, como no N64:** as músicas não são gravações. As notas ficam escritas no código (em MML, `src/songs.c`) e o sintetizador do jogo (`src/synth.c`) toca tudo ao vivo, com instrumentos no estilo N64 (cordas, flauta, metais, harpa, baixo, coral, sino e bateria) e eco de sala.
+- **Música dinâmica:** cada música tem camadas. Por exemplo, tambores e metais entram na música do campo quando um inimigo persegue o jogador e saem devagar depois da luta.
+- **Base da trilha:** músicas compostas pelo autor do jogo com IA (álbuns *After Image*), em `assets/music_src/`. Elas servem de **inspiração**: `tools/transcribe.py` extrai melodias, baixo e acordes (em `docs/transcricao/`), e os arranjos do jogo são reescritos e adaptados ao clima de cada lugar.
+- **Vozes:** sem falas gravadas. Os personagens só soltam gritinhos e grunhidos curtos (ataque, dano, esforço), sintetizados. **Todo o diálogo é em texto.**
 
 Distribuição baseada nas medições de [MUSICA_ANALISE.md](MUSICA_ANALISE.md) (andamento, tom, energia, brilho) e nos nomes das faixas:
 

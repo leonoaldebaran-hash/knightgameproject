@@ -133,6 +133,7 @@ static void UpdateSoldier(Soldier *s, Player *p, float dt)
                 SetState(s, SOLDIER_STRIKE);
                 s->struck = false;
                 Sfx_Play(SFX_SWING);
+                Sfx_Play(SFX_VOICE_ENEMY);
             }
             break;
 

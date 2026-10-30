@@ -71,6 +71,7 @@ HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
     }
 
     Sfx_Play(SFX_HURT);
+    Sfx_Play(SFX_VOICE_HURT);
 
     p->hp -= damage;
     p->state = PSTATE_HURT;
@@ -129,6 +130,7 @@ static void StartAttack(Player *p, int step, Vector3 wishDir)
     p->attackTimer = 0.0f;
     p->attackId++;
     Sfx_Play(SFX_SWING);
+    if (step != 1) Sfx_Play(SFX_VOICE_ATTACK);   // grita no 1º e no 3º golpe do combo
 }
 
 // Com a mira travada: anda de lado em volta do alvo, sempre de frente para ele

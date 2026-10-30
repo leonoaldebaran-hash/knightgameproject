@@ -101,8 +101,42 @@ float Target_BarAmount(void);   // 0 a 1: faixas pretas de cinema na tela
 void Music_Init(void);
 void Music_Update(bool inBattle, float dt);
 
+// Sintetizador e sequenciador no estilo N64 (synth.c)
+typedef enum {
+    INST_STRINGS, INST_FLUTE, INST_BRASS, INST_HARP,
+    INST_BASS, INST_CHOIR, INST_BELL, INST_DRUMS, INST_COUNT
+} InstrumentId;
+
+typedef struct SongChannel {
+    InstrumentId instrument;
+    float volume;
+    int layer;          // 0 = toca sempre; 1 = só entra com intensidade (combate)
+    const char *mml;    // as notas, em MML
+} SongChannel;
+
+typedef struct Song {
+    const char *name;
+    float bpm;
+    int channelCount;
+    SongChannel channels[8];
+} Song;
+
+void Synth_Init(void);
+void Synth_Play(const Song *song);
+void Synth_SetIntensity(float amount);
+void Synth_SetVolume(float volume);
+
+// Músicas compostas (songs.c)
+extern const Song SONG_FIELD;
+
 // Efeitos sonoros (sfx.c)
-typedef enum { SFX_SWING, SFX_HIT, SFX_BLOCK, SFX_HURT, SFX_ALERT, SFX_COUNT } SfxId;
+typedef enum {
+    SFX_SWING, SFX_HIT, SFX_BLOCK, SFX_HURT, SFX_ALERT,
+    SFX_VOICE_ATTACK,   // grito curto do Mateo ao golpear ("rá!")
+    SFX_VOICE_HURT,     // gemido do Mateo ao levar dano
+    SFX_VOICE_ENEMY,    // grunhido grave do soldado ao atacar
+    SFX_COUNT
+} SfxId;
 void Sfx_Init(void);
 void Sfx_Play(SfxId id);
 
