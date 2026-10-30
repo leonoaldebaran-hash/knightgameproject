@@ -25,6 +25,12 @@ static void UpdateDrawFrame(void)
     {
         input.x += GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X);
         input.y += GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y);
+
+        // Direcional (D-pad) do R36S
+        if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) input.x += 1.0f;
+        if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT))  input.x -= 1.0f;
+        if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN))  input.y += 1.0f;
+        if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP))    input.y -= 1.0f;
     }
     if (Vector2Length(input) > 1.0f) input = Vector2Normalize(input);
 
