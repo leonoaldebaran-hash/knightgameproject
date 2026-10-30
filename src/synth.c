@@ -139,7 +139,7 @@ bool Synth_LoadBank(const unsigned char *data, int size)
 // (4 = semínima, 8 = colcheia...), "." pontua, o4 oitava, < > desce/sobe oitava,
 // l8 duração padrão, v12 força (0 a 15), [ ... ]3 repete 3 vezes.
 // ---------------------------------------------------------------------------
-typedef struct MmlState { int octave, length, tick; float velocity; Channel *ch; } MmlState;
+typedef struct MmlState { int octave, length, tick, transpose; float velocity; Channel *ch; } MmlState;
 
 static int ReadNumber(const char **s)
 {
@@ -172,7 +172,7 @@ static void ParseMml(const char *s, const char *end, MmlState *st)
             else if (*s == '-') { semi--; s++; }
             int ticks = ReadLength(&s, st->length);
             if (st->ch->count < MAX_EVENTS)
-                st->ch->events[st->ch->count++] = (NoteEvent){ st->tick, ticks, (st->octave + 1)*12 + semi, st->velocity };
+                st->ch->events[st->ch->count++] = (NoteEvent){ st->tick, ticks, (st->octave + 1)*12 + semi + st->transpose, st->velocity };
             st->tick += ticks;
         }
         else if (c == '(')
@@ -189,7 +189,7 @@ static void ParseMml(const char *s, const char *end, MmlState *st)
                     int semi = semis[k - 'a'];
                     if (*s == '+' || *s == '#') { semi++; s++; }
                     else if (*s == '-') { semi--; s++; }
-                    midis[n++] = (st->octave + 1)*12 + semi;
+                    midis[n++] = (st->octave + 1)*12 + semi + st->transpose;
                 }
                 else if (k == 'o') st->octave = ReadNumber(&s);
                 else if (k == '<') st->octave--;
@@ -205,6 +205,14 @@ static void ParseMml(const char *s, const char *end, MmlState *st)
         }
         else if (c == 'r') st->tick += ReadLength(&s, st->length);
         else if (c == 'o') st->octave = ReadNumber(&s);
+        else if (c == 'k')
+        {
+            // Transposição em semitons para as notas seguintes: k12 sobe uma oitava, k-12 desce, k0 volta
+            int sign = 1;
+            if (*s == '-') { sign = -1; s++; }
+            int n = ReadNumber(&s);
+            st->transpose = sign*((n < 0) ? 0 : n);
+        }
         else if (c == '<') st->octave--;
         else if (c == '>') st->octave++;
         else if (c == 'l') st->length = ReadLength(&s, st->length);
