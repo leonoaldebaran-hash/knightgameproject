@@ -44,6 +44,7 @@ static void UpdateDrawFrame(void)
     float dt = GetFrameTime();
     if (dt > 0.1f) dt = 0.1f;   // evita "teleportes" quando a aba fica em segundo plano
 
+    Target_Update(&player, &gameCamera.cam, dt);
     Player_Update(&player, gameCamera.yaw, dt);
     Soldiers_Update(&player, dt);
     Dummies_Update(dt);
@@ -58,11 +59,20 @@ static void UpdateDrawFrame(void)
         Dummies_Draw();
         Soldiers_Draw();
         Player_Draw(&player);
+        Target_Draw();
     EndMode3D();
 
-    DrawText("Knight Game Project - Tarefa 5 + som", 10, 10, 20, RAYWHITE);
-    DrawText("Andar: setas/WASD ou analogico | Camera: Q/E ou analogico direito | Centralizar: C ou L1", 10, 34, 10, RAYWHITE);
-    DrawText("Espada: J ou B (aperte 3x para o combo) | Escudo: segure K ou R1", 10, 48, 10, RAYWHITE);
+    // Faixas pretas de cinema com a mira travada, como no N64
+    int bar = (int)(36.0f*Target_BarAmount());
+    if (bar > 0)
+    {
+        DrawRectangle(0, 0, SCREEN_W, bar, BLACK);
+        DrawRectangle(0, SCREEN_H - bar, SCREEN_W, bar, BLACK);
+    }
+
+    DrawText("Knight Game Project - Tarefa 6", 10, 10, 20, RAYWHITE);
+    DrawText("Andar: setas/WASD ou analogico | Camera: Q/E ou analogico direito | Mira: segure C ou L1", 10, 34, 10, RAYWHITE);
+    DrawText("Espada: J ou B | Escudo: segure K ou R1 | Com a mira: Espaco ou A + lado = salto, + tras = mortal", 10, 48, 10, RAYWHITE);
     DrawText(TextFormat("Acertos: %d", Dummies_TotalHits()), SCREEN_W - 110, 10, 20, RAYWHITE);
     DrawHearts(player.hp, player.maxHp, 24.0f, 74.0f);
 

@@ -18,6 +18,15 @@
 #define INVULN_TIME   1.0f    // tempo piscando sem levar dano
 #define BLOCK_PUSH    3.0f    // empurrão ao defender com o escudo
 
+#define STRAFE_SPEED  4.5f    // andando em volta do alvo com a mira travada
+#define LOCK_TURN     15.0f   // rapidez para virar de frente para o alvo
+#define SIDEHOP_TIME  0.35f
+#define SIDEHOP_SPEED 9.0f
+#define SIDEHOP_HIGH  0.5f
+#define BACKFLIP_TIME 0.45f
+#define BACKFLIP_SPEED 7.5f
+#define BACKFLIP_HIGH 1.0f
+
 static const Vector3 spawnPos = { 0.0f, 0.0f, 6.0f };
 
 typedef struct AttackInfo {
@@ -45,7 +54,8 @@ void Player_Init(Player *p)
 
 HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
 {
-    if (p->invulnTimer > 0.0f || p->state == PSTATE_HURT) return HIT_IGNORED;
+    // Durante a esquiva o jogador não leva dano: é o momento de escapar do golpe
+    if (p->invulnTimer > 0.0f || p->state == PSTATE_HURT || p->state == PSTATE_DODGE) return HIT_IGNORED;
 
     float dx = from.x - p->pos.x, dz = from.z - p->pos.z;
     float toAttacker = atan2f(dx, dz);
@@ -102,16 +112,81 @@ static void TurnTowards(Player *p, float targetAngle, float speed, float dt)
     p->angle = WrapAngle(p->angle + WrapAngle(targetAngle - p->angle)*fminf(1.0f, speed*dt));
 }
 
+static float AngleToTarget(const Player *p)
+{
+    Vector3 t = Target_Pos();
+    return atan2f(t.x - p->pos.x, t.z - p->pos.z);
+}
+
 static void StartAttack(Player *p, int step, Vector3 wishDir)
 {
-    // Ao iniciar o golpe, vira na hora para onde o direcional aponta
-    if (Vector3Length(wishDir) > 0.1f) p->angle = atan2f(wishDir.x, wishDir.z);
+    // Ao iniciar o golpe, vira na hora para o alvo travado ou para onde o direcional aponta
+    if (Target_Active()) p->angle = AngleToTarget(p);
+    else if (Vector3Length(wishDir) > 0.1f) p->angle = atan2f(wishDir.x, wishDir.z);
 
     p->state = PSTATE_ATTACK;
     p->attackStep = step;
     p->attackTimer = 0.0f;
     p->attackId++;
     Sfx_Play(SFX_SWING);
+}
+
+// Com a mira travada: anda de lado em volta do alvo, sempre de frente para ele
+static void UpdateLocked(Player *p, Vector3 wishDir, float dt)
+{
+    Vector3 targetVel = Vector3Scale(wishDir, STRAFE_SPEED);
+    float rate = (Vector3Length(wishDir) > 0.0f) ? ACCEL : DECEL;
+    p->vel = Vector3MoveTowards(p->vel, targetVel, rate*dt);
+    TurnTowards(p, AngleToTarget(p), LOCK_TURN, dt);
+}
+
+// Salto lateral (direcional para o lado) ou mortal para trás (direcional para trás)
+static bool TryDodge(Player *p, Vector3 wishDir)
+{
+    if (Vector3Length(wishDir) < 0.3f) return false;
+
+    float a = AngleToTarget(p);
+    Vector3 toTarget = { sinf(a), 0.0f, cosf(a) };
+    Vector3 left = { cosf(a), 0.0f, -sinf(a) };
+    float forward = Vector3DotProduct(wishDir, toTarget);
+    float side = Vector3DotProduct(wishDir, left);
+
+    if (forward < -0.5f)
+    {
+        p->dodgeBack = true;
+        p->vel = Vector3Scale(toTarget, -BACKFLIP_SPEED);
+    }
+    else if (fabsf(side) > 0.3f)
+    {
+        p->dodgeBack = false;
+        p->dodgeSide = (side > 0.0f) ? -1.0f : 1.0f;
+        p->vel = Vector3Scale(left, (side > 0.0f) ? SIDEHOP_SPEED : -SIDEHOP_SPEED);
+    }
+    else return false;   // para a frente: no futuro, o golpe com pulo
+
+    p->angle = a;
+    p->state = PSTATE_DODGE;
+    p->dodgeTimer = 0.0f;
+    Sfx_Play(SFX_SWING);
+    return true;
+}
+
+static void UpdateDodge(Player *p, float dt)
+{
+    float duration = p->dodgeBack ? BACKFLIP_TIME : SIDEHOP_TIME;
+    float high = p->dodgeBack ? BACKFLIP_HIGH : SIDEHOP_HIGH;
+
+    p->dodgeTimer += dt;
+    float t = fminf(p->dodgeTimer/duration, 1.0f);
+    p->pos.y = sinf(t*PI)*high;   // arco do pulo
+    if (Target_Active()) TurnTowards(p, AngleToTarget(p), LOCK_TURN, dt);
+
+    if (t >= 1.0f)
+    {
+        p->pos.y = 0.0f;
+        p->vel = Vector3Scale(p->vel, 0.3f);   // aterrissa freando
+        p->state = PSTATE_NORMAL;
+    }
 }
 
 static void UpdateNormal(Player *p, Vector3 wishDir, float dt)
@@ -166,7 +241,8 @@ static void UpdateShield(Player *p, Vector3 wishDir, float dt)
 {
     // Com o escudo levantado o jogador fica parado, mas pode virar
     p->vel = Vector3MoveTowards(p->vel, Vector3Zero(), DECEL*dt);
-    if (Vector3Length(wishDir) > 0.1f) TurnTowards(p, atan2f(wishDir.x, wishDir.z), SHIELD_TURN, dt);
+    if (Target_Active()) TurnTowards(p, AngleToTarget(p), LOCK_TURN, dt);
+    else if (Vector3Length(wishDir) > 0.1f) TurnTowards(p, atan2f(wishDir.x, wishDir.z), SHIELD_TURN, dt);
 }
 
 void Player_Update(Player *p, float camYaw, float dt)
@@ -174,6 +250,7 @@ void Player_Update(Player *p, float camYaw, float dt)
     Vector3 wishDir = WishDirection(camYaw);
     bool attackPressed = Input_Attack();
     bool shieldHeld = Input_Shield();
+    bool dodgePressed = Input_Dodge();
 
     if (p->invulnTimer > 0.0f) p->invulnTimer -= dt;
     if (p->blockFlash > 0.0f) p->blockFlash -= dt;
@@ -184,7 +261,13 @@ void Player_Update(Player *p, float camYaw, float dt)
         case PSTATE_NORMAL:
             if (attackPressed) StartAttack(p, 0, wishDir);
             else if (shieldHeld) p->state = PSTATE_SHIELD;
+            else if (Target_Active() && dodgePressed && TryDodge(p, wishDir)) break;
+            else if (Target_Active()) UpdateLocked(p, wishDir, dt);
             else UpdateNormal(p, wishDir, dt);
+            break;
+
+        case PSTATE_DODGE:
+            UpdateDodge(p, dt);
             break;
 
         case PSTATE_ATTACK:
@@ -263,6 +346,17 @@ void Player_Draw(const Player *p)
     rlPushMatrix();
         rlTranslatef(p->pos.x, p->pos.y, p->pos.z);
         rlRotatef(p->angle*RAD2DEG, 0.0f, 1.0f, 0.0f);
+
+        // Mortal para trás gira o corpo inteiro; o salto lateral só inclina para o lado
+        if (p->state == PSTATE_DODGE)
+        {
+            float t = fminf(p->dodgeTimer/(p->dodgeBack ? BACKFLIP_TIME : SIDEHOP_TIME), 1.0f);
+            rlTranslatef(0.0f, 0.7f, 0.0f);
+            if (p->dodgeBack) rlRotatef(-360.0f*t, 1.0f, 0.0f, 0.0f);
+            else rlRotatef(p->dodgeSide*15.0f, 0.0f, 0.0f, 1.0f);
+            rlTranslatef(0.0f, -0.7f, 0.0f);
+        }
+
         DrawCube((Vector3){ 0.0f, 0.6f, 0.0f }, 0.6f, 1.2f, 0.4f, body);                         // corpo
         DrawSphere((Vector3){ 0.0f, 1.45f, 0.0f }, 0.3f, (Color){ 240, 200, 90, 255 });         // cabeça loira
 

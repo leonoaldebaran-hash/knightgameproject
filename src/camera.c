@@ -5,6 +5,8 @@
 #define CAM_ORBIT_SPEED 2.5f   // radianos por segundo
 #define CAM_FOLLOW      6.0f   // suavidade ao seguir o jogador
 #define CAM_RECENTER    8.0f   // rapidez para voltar para trás do jogador
+#define CAM_LOCK_TURN   6.0f   // rapidez para se alinhar atrás do jogador com a mira travada
+#define CAM_LOCK_MIX    0.35f  // com a mira travada, o foco fica entre o jogador e o alvo
 
 void GameCamera_Init(GameCamera *c)
 {
@@ -16,12 +18,24 @@ void GameCamera_Init(GameCamera *c)
 
 void GameCamera_Update(GameCamera *c, const Player *p, float dt)
 {
-    c->yaw -= Input_Orbit()*CAM_ORBIT_SPEED*dt;
-    if (Input_Recenter()) c->yaw += WrapAngle(p->angle + PI - c->yaw)*fminf(1.0f, CAM_RECENTER*dt);
+    // O foco segue o jogador com um pequeno atraso (sem subir junto nos pulos)
+    Vector3 focusTarget = { p->pos.x, 1.0f, p->pos.z };
+
+    if (Target_Active())
+    {
+        // Mira travada: câmera atrás do jogador, enquadrando o jogador e o alvo
+        Vector3 t = Target_Pos();
+        float behind = atan2f(p->pos.x - t.x, p->pos.z - t.z);
+        c->yaw += WrapAngle(behind - c->yaw)*fminf(1.0f, CAM_LOCK_TURN*dt);
+        focusTarget = Vector3Lerp(focusTarget, (Vector3){ t.x, 1.0f, t.z }, CAM_LOCK_MIX);
+    }
+    else
+    {
+        c->yaw -= Input_Orbit()*CAM_ORBIT_SPEED*dt;
+        if (Input_Target()) c->yaw += WrapAngle(p->angle + PI - c->yaw)*fminf(1.0f, CAM_RECENTER*dt);
+    }
     c->yaw = WrapAngle(c->yaw);
 
-    // O foco segue o jogador com um pequeno atraso
-    Vector3 focusTarget = { p->pos.x, p->pos.y + 1.0f, p->pos.z };
     c->focus = Vector3Lerp(c->focus, focusTarget, fminf(1.0f, CAM_FOLLOW*dt));
 
     c->cam.target = c->focus;

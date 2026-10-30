@@ -48,8 +48,19 @@ bool Input_Shield(void)
     return IsKeyDown(KEY_K) || (IsGamepadAvailable(0) && IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1));
 }
 
-// Centralizar a câmera atrás do jogador: C ou L1
-bool Input_Recenter(void)
+// Mira travada (segurar): C ou L1. Sem alvo por perto, centraliza a câmera atrás do jogador.
+bool Input_Target(void)
 {
     return IsKeyDown(KEY_C) || (IsGamepadAvailable(0) && IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_TRIGGER_1));
+}
+
+bool Input_TargetPressed(void)
+{
+    return IsKeyPressed(KEY_C) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_LEFT_TRIGGER_1));
+}
+
+// Ação / esquiva: Espaço ou botão A (embaixo dos botões de ação)
+bool Input_Dodge(void)
+{
+    return IsKeyPressed(KEY_SPACE) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN));
 }

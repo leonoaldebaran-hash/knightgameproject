@@ -12,6 +12,7 @@ typedef enum PlayerState {
     PSTATE_ATTACK,   // golpe de espada em andamento
     PSTATE_SHIELD,   // escudo levantado
     PSTATE_HURT,     // empurrado para trás depois de levar um golpe
+    PSTATE_DODGE,    // salto lateral ou mortal para trás (com a mira travada)
 } PlayerState;
 
 typedef struct Player {
@@ -28,6 +29,9 @@ typedef struct Player {
     float invulnTimer;  // tempo restante sem poder levar dano (pisca)
     float blockFlash;   // brilho no escudo depois de defender
     float fallenTimer;  // tempo da mensagem "Voce caiu!"
+    float dodgeTimer;   // tempo desde o início da esquiva
+    bool dodgeBack;     // esquiva para trás (mortal) ou para o lado
+    float dodgeSide;    // -1 esquerda, +1 direita (só no salto lateral)
 } Player;
 
 typedef struct GameCamera {
@@ -47,7 +51,9 @@ static inline float WrapAngle(float a)
 // Entrada (input.c)
 Vector2 Input_Move(void);
 float Input_Orbit(void);
-bool Input_Recenter(void);
+bool Input_Target(void);
+bool Input_TargetPressed(void);
+bool Input_Dodge(void);
 bool Input_Attack(void);
 bool Input_Shield(void);
 
@@ -79,6 +85,17 @@ void Dummies_Draw(void);
 int Dummies_TotalHits(void);
 
 bool Soldiers_Engaged(void);
+int Soldiers_Count(void);
+bool Soldiers_TargetPos(int i, Vector3 *pos);
+int Dummies_Count(void);
+bool Dummies_TargetPos(int i, Vector3 *pos);
+
+// Mira travada (target.c)
+void Target_Update(const Player *p, const Camera3D *cam, float dt);
+bool Target_Active(void);
+Vector3 Target_Pos(void);
+void Target_Draw(void);
+float Target_BarAmount(void);   // 0 a 1: faixas pretas de cinema na tela
 
 // Música (music.c)
 void Music_Init(void);

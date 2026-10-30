@@ -104,6 +104,19 @@ Vector3 Dummies_Collide(Vector3 pos, float radius)
     return pos;
 }
 
+int Dummies_Count(void)
+{
+    return MAX_DUMMIES;
+}
+
+// Posição do boneco para a mira travada; falso se ele estiver caído
+bool Dummies_TargetPos(int i, Vector3 *pos)
+{
+    if (dummies[i].hp <= 0) return false;
+    *pos = dummies[i].pos;
+    return true;
+}
+
 int Dummies_TotalHits(void)
 {
     return totalHits;

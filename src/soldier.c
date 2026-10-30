@@ -211,6 +211,19 @@ int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int at
     return hits;
 }
 
+int Soldiers_Count(void)
+{
+    return MAX_SOLDIERS;
+}
+
+// Posição do soldado para a mira travada; falso se ele estiver caído
+bool Soldiers_TargetPos(int i, Vector3 *pos)
+{
+    if (soldiers[i].state == SOLDIER_DEAD) return false;
+    *pos = soldiers[i].pos;
+    return true;
+}
+
 // Algum soldado está lutando com o jogador? (usado para trocar a música)
 bool Soldiers_Engaged(void)
 {
