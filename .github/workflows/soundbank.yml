@@ -1,0 +1,41 @@
+name: Montar banco de instrumentos
+
+on:
+  push:
+    branches: [main]
+    paths: ['tools/build_soundbank.py', '.github/workflows/soundbank.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  soundbank:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar bibliotecas de áudio
+        run: pip install librosa==0.10.2.post1 "numpy<2" "scipy<1.13" soundfile
+
+      - name: Montar o banco
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/build_soundbank.py 2>&1 | tee build_soundbank.log
+
+      - name: Salvar no repositório
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p docs
+          tail -n 60 build_soundbank.log > docs/soundbank_log.txt || true
+          git add assets/soundbank.bin docs/SOUNDBANK.md docs/soundbank_log.txt || true
+          git diff --cached --quiet || git commit -m "Update instrument sound bank"
+          git pull --rebase
+          git push
