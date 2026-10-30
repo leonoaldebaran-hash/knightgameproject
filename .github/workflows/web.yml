@@ -37,6 +37,8 @@ jobs:
 
       - name: Compilar o jogo
         run: |
+          # Faz os erros e avisos do compilador aparecerem como anotações no GitHub
+          echo "::add-matcher::.github/gcc-matcher.json"
           mkdir -p public
           VERSION=$(echo "$GITHUB_SHA" | cut -c1-7)
           # Nome novo a cada build para o navegador nunca usar uma versão antiga do cache

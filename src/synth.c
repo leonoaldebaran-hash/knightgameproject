@@ -335,7 +335,7 @@ static void StepTick(void)
 }
 
 // Roda na thread de áudio: gera cada amostra na hora
-static void AudioCallback(void *buffer, unsigned int frames)
+static void SynthCallback(void *buffer, unsigned int frames)
 {
     short *out = (short *)buffer;
     double samplesPerTick = SYNTH_RATE*60.0/(bpm*TICKS_PER_BEAT);
@@ -381,7 +381,7 @@ void Synth_Init(void)
 {
     SetAudioStreamBufferSizeDefault(BUFFER_FRAMES);
     stream = LoadAudioStream(SYNTH_RATE, 16, 1);
-    SetAudioStreamCallback(stream, AudioCallback);
+    SetAudioStreamCallback(stream, SynthCallback);
     PlayAudioStream(stream);
 }
 
