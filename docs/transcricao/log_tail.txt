@@ -1,0 +1,17 @@
+WARNING:root:Coremltools is not installed. If you plan to use a CoreML Saved Model, reinstall basic-pitch with `pip install 'basic-pitch[coreml]'`
+WARNING:root:Tensorflow is not installed. If you plan to use a TF Saved Model, reinstall basic-pitch with `pip install 'basic-pitch[tf]'`
+== tema_campo: notas da voz
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/basic_pitch/inference.py:229: UserWarning: PySoundFile failed. Trying audioread instead.
+  audio_original, _ = librosa.load(str(audio_path), sr=AUDIO_SAMPLE_RATE, mono=True)
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/librosa/core/audio.py:184: FutureWarning: librosa.core.audio.__audioread_load
+	Deprecated as of librosa version 0.10.0.
+	It will be removed in librosa version 1.0.
+  y, sr_native = __audioread_load(path, offset, duration, dtype)
+/home/runner/work/knightgameproject/knightgameproject/tools/transcribe.py:166: UserWarning: PySoundFile failed. Trying audioread instead.
+  y, sr = librosa.load(path, sr=22050, mono=True)
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/librosa/core/audio.py:184: FutureWarning: librosa.core.audio.__audioread_load
+	Deprecated as of librosa version 0.10.0.
+	It will be removed in librosa version 1.0.
+  y, sr_native = __audioread_load(path, offset, duration, dtype)
+Predicting MIDI for assets/hum/tema_campo.m4a...
+== tema_campo: pronto
