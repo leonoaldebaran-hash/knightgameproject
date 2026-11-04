@@ -44,6 +44,7 @@ typedef struct Soldier {
     bool struck;            // o golpe atual já foi resolvido
     float flash;            // brilho de "levou golpe"
     int lastHitId;
+    float playerDist;       // distância até o jogador no último quadro
 } Soldier;
 
 static Soldier soldiers[MAX_SOLDIERS];
@@ -89,6 +90,7 @@ static void UpdateSoldier(Soldier *s, Player *p, float dt)
     float dist = sqrtf(dx*dx + dz*dz);
     float toPlayer = atan2f(dx, dz);
     Vector3 facing = { sinf(s->angle), 0.0f, cosf(s->angle) };
+    s->playerDist = dist;
 
     s->timer += dt;
     if (s->flash > 0.0f) s->flash -= dt;
@@ -230,8 +232,10 @@ bool Soldiers_Engaged(void)
 {
     for (int i = 0; i < MAX_SOLDIERS; i++)
     {
+        // Perseguindo de longe ainda não é luta; só conta quando ele chega perto ou ataca
         SoldierState st = soldiers[i].state;
-        if (st != SOLDIER_PATROL && st != SOLDIER_DEAD) return true;
+        if (st == SOLDIER_PATROL || st == SOLDIER_DEAD) continue;
+        if (st != SOLDIER_CHASE || soldiers[i].playerDist < 6.0f) return true;
     }
     return false;
 }

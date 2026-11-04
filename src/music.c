@@ -18,9 +18,9 @@
 #endif
 
 #define MUSIC_VOLUME   0.7f
-#define FADE_SPEED     1.2f   // volume por segundo na troca de faixa
+#define FADE_SPEED     0.4f   // volume por segundo na troca de faixa (~2 s de mistura)
 #define LOOP_XFADE     4.0f   // segundos de mistura entre o fim e o começo da mesma faixa
-#define BATTLE_HOLD    2.5f   // segundos que a música de combate continua depois da luta
+#define BATTLE_HOLD    6.0f   // segundos que a música de combate continua depois da luta
 
 static const char *trackFiles[TRACK_COUNT] = {
     [TRACK_FIELD]  = "after_future.ogg",    // campo de Pangea
@@ -33,6 +33,7 @@ typedef struct Track {
     float deckVolume[2]; // mistura do loop
     float volume;        // volume da faixa (troca de lugar / combate)
     bool loaded;
+    bool paused;         // em silêncio: pausada para continuar de onde parou
 } Track;
 
 static Track tracks[TRACK_COUNT];
@@ -156,6 +157,19 @@ void Music_Update(bool inBattle, float dt)
         float target = (i == (int)wanted) ? MUSIC_VOLUME : 0.0f;
         if (t->volume < target) t->volume = fminf(target, t->volume + FADE_SPEED*dt);
         else t->volume = fmaxf(target, t->volume - FADE_SPEED*dt);
+
+        // Faixa que sumiu de vez fica pausada e depois continua de onde parou
+        if (!t->paused && t->volume <= 0.0f && target <= 0.0f)
+        {
+            for (int d = 0; d < 2; d++) PauseMusicStream(t->deck[d]);
+            t->paused = true;
+        }
+        if (t->paused)
+        {
+            if (target <= 0.0f) continue;
+            for (int d = 0; d < 2; d++) if (t->deckVolume[d] > 0.0f) ResumeMusicStream(t->deck[d]);
+            t->paused = false;
+        }
 
         UpdateLoop(t, dt);
         for (int d = 0; d < 2; d++)

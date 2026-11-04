@@ -31,7 +31,13 @@
 #define ROLL_SPEED    9.0f
 #define ROLL_SAFE     0.30f   // começo do rolamento em que o jogador não leva dano
 
-#define CHARGE_TIME   0.7f    // segurando o ataque esse tempo, o golpe giratório fica pronto
+#define GRAVITY       25.0f   // queda (unidades por segundo²)
+#define JUMP_VEL      6.5f    // impulso do pulo automático (~0,85 de altura)
+#define AUTOJUMP_SPEED 4.5f   // acima dessa velocidade, sair de uma borda vira pulo
+#define STEP_DOWN     0.3f    // descer até isso continua "pisando" (degraus)
+#define AIR_CONTROL   0.35f   // quanto dá para corrigir a direção no ar
+
+#define CHARGE_TIME   0.7f   // segurando o ataque esse tempo, o golpe giratório fica pronto
 #define CHARGE_SPEED  1.8f    // dá para andar devagar enquanto carrega
 #define SPIN_TIME     0.40f   // duração do golpe giratório
 #define SPIN_REACH    2.3f    // alcance em volta do jogador
@@ -59,6 +65,7 @@ void Player_Init(Player *p)
     p->angle = PI;   // começa olhando para os pilares
     p->radius = 0.35f;
     p->hp = p->maxHp = START_HP;
+    p->grounded = true;
 }
 
 HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
@@ -102,6 +109,8 @@ static void UpdateHurt(Player *p, float dt)
         // Por enquanto, cair só leva de volta ao início com a vida cheia
         p->pos = spawnPos;
         p->vel = Vector3Zero();
+        p->velY = 0.0f;
+        p->grounded = true;
         p->angle = PI;
         p->hp = p->maxHp;
         p->fallenTimer = 2.5f;
@@ -163,19 +172,24 @@ static bool TryDodge(Player *p, Vector3 wishDir)
     float forward = Vector3DotProduct(wishDir, toTarget);
     float side = Vector3DotProduct(wishDir, left);
 
+    if (!p->grounded) return false;
+
     if (forward < -0.5f)
     {
         p->dodgeBack = true;
         p->vel = Vector3Scale(toTarget, -BACKFLIP_SPEED);
+        p->velY = sqrtf(2.0f*GRAVITY*BACKFLIP_HIGH);
     }
     else if (fabsf(side) > 0.3f)
     {
         p->dodgeBack = false;
         p->dodgeSide = (side > 0.0f) ? -1.0f : 1.0f;
         p->vel = Vector3Scale(left, (side > 0.0f) ? SIDEHOP_SPEED : -SIDEHOP_SPEED);
+        p->velY = sqrtf(2.0f*GRAVITY*SIDEHOP_HIGH);
     }
     else return false;   // para a frente: no futuro, o golpe com pulo
 
+    p->grounded = false;
     p->angle = a;
     p->state = PSTATE_DODGE;
     p->dodgeTimer = 0.0f;
@@ -185,17 +199,12 @@ static bool TryDodge(Player *p, Vector3 wishDir)
 
 static void UpdateDodge(Player *p, float dt)
 {
-    float duration = p->dodgeBack ? BACKFLIP_TIME : SIDEHOP_TIME;
-    float high = p->dodgeBack ? BACKFLIP_HIGH : SIDEHOP_HIGH;
-
+    // O pulo em si é feito pela gravidade (UpdateVertical); aqui só termina ao pousar
     p->dodgeTimer += dt;
-    float t = fminf(p->dodgeTimer/duration, 1.0f);
-    p->pos.y = sinf(t*PI)*high;   // arco do pulo
     if (Target_Active()) TurnTowards(p, AngleToTarget(p), LOCK_TURN, dt);
 
-    if (t >= 1.0f)
+    if (p->grounded && p->dodgeTimer > 0.1f)
     {
-        p->pos.y = 0.0f;
         p->vel = Vector3Scale(p->vel, 0.3f);   // aterrissa freando
         p->state = PSTATE_NORMAL;
     }
@@ -206,6 +215,7 @@ static void UpdateNormal(Player *p, Vector3 wishDir, float dt)
     // Aceleração e freio curtos dão "peso" ao personagem
     Vector3 targetVel = Vector3Scale(wishDir, RUN_SPEED);
     float rate = (Vector3Length(wishDir) > 0.0f) ? ACCEL : DECEL;
+    if (!p->grounded) rate *= AIR_CONTROL;   // no ar dá para corrigir só um pouco
     p->vel = Vector3MoveTowards(p->vel, targetVel, rate*dt);
 
     // Vira suavemente para a direção em que está andando
@@ -325,6 +335,43 @@ static void UpdateShield(Player *p, Vector3 wishDir, float dt)
     else if (Vector3Length(wishDir) > 0.1f) TurnTowards(p, atan2f(wishDir.x, wishDir.z), SHIELD_TURN, dt);
 }
 
+// Altura: sobe degraus baixos sozinho, cai das bordas e pula sozinho quando sai correndo
+static void UpdateVertical(Player *p, float dt)
+{
+    float ground = World_GroundHeight(p->pos);
+    p->groundY = ground;
+
+    if (p->grounded)
+    {
+        if (ground >= p->pos.y - STEP_DOWN)
+        {
+            p->pos.y = ground;
+            p->velY = 0.0f;
+            return;
+        }
+
+        // Saiu de uma borda: correndo vira pulo (como no Ocarina), andando só cai
+        p->grounded = false;
+        float speed = sqrtf(p->vel.x*p->vel.x + p->vel.z*p->vel.z);
+        bool canJump = (p->state == PSTATE_NORMAL || p->state == PSTATE_ROLL);
+        if (canJump && speed > AUTOJUMP_SPEED)
+        {
+            p->velY = JUMP_VEL;
+            Sfx_Play(SFX_VOICE_ATTACK);
+        }
+        else p->velY = 0.0f;
+    }
+
+    p->velY -= GRAVITY*dt;
+    p->pos.y += p->velY*dt;
+    if (p->pos.y <= ground && p->velY <= 0.0f)
+    {
+        p->pos.y = ground;
+        p->velY = 0.0f;
+        p->grounded = true;
+    }
+}
+
 void Player_Update(Player *p, float camYaw, float dt)
 {
     Vector3 wishDir = WishDirection(camYaw);
@@ -382,6 +429,7 @@ void Player_Update(Player *p, float camYaw, float dt)
     p->pos = World_Collide(p->pos, p->radius);
     p->pos = Dummies_Collide(p->pos, p->radius);
     p->pos = Soldiers_Collide(p->pos, p->radius);
+    UpdateVertical(p, dt);
 }
 
 // Ângulo da espada (graus, em volta do ombro) durante o golpe. Positivo = lado esquerdo.
@@ -428,7 +476,9 @@ static void DrawSwordSwing(const Player *p)
 void Player_Draw(const Player *p)
 {
     // Sombra redonda no chão, como no N64
-    DrawCylinder((Vector3){ p->pos.x, 0.01f, p->pos.z }, 0.45f, 0.45f, 0.01f, 16, Fade(BLACK, 0.3f));
+    // Sombra no chão embaixo dele, menor quanto mais alto ele estiver (ajuda a mirar o pulo)
+    float shadow = 0.45f*Clamp(1.0f - (p->pos.y - p->groundY)*0.25f, 0.4f, 1.0f);
+    DrawCylinder((Vector3){ p->pos.x, p->groundY + 0.01f, p->pos.z }, shadow, shadow, 0.01f, 16, Fade(BLACK, 0.3f));
 
     // Pisca enquanto está invulnerável depois de levar dano
     if (p->invulnTimer > 0.0f && fmodf(p->invulnTimer, 0.12f) < 0.06f) return;

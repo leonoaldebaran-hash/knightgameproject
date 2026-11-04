@@ -76,10 +76,12 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 - [x] Som: grunhidos e efeitos; trilha com as músicas do autor (After Future no campo, Paganini Fist no combate)
       com loop suave (duas cópias se cruzando) e silêncio do começo e do fim cortado
 - [x] Tarefa 7: rolamento e golpe giratório carregado
+- [x] Tarefa 8: alturas (degraus até 0,45 sobem andando), gravidade, pulo automático ao sair correndo
+      de uma borda, percurso de teste ao lado do início; troca campo/combate mais suave
+      (combate só de perto, mistura de ~2 s, campo pausa e continua de onde parou)
 
 ## Próximas tarefas
 **Fase 2: terminar o combate**
-- [ ] 8: pulo automático nas bordas, alturas e plataformas
 - [ ] 9: arqueiro e cavaleiro pesado com escudo
 
 **Fase 3: sistemas**

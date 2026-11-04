@@ -18,8 +18,9 @@ void GameCamera_Init(GameCamera *c)
 
 void GameCamera_Update(GameCamera *c, const Player *p, float dt)
 {
-    // O foco segue o jogador com um pequeno atraso (sem subir junto nos pulos)
-    Vector3 focusTarget = { p->pos.x, 1.0f, p->pos.z };
+    // O foco segue o jogador com um pequeno atraso; acompanha a altura do chão
+    // (escadas, plataformas), mas não sobe e desce junto com cada pulo
+    Vector3 focusTarget = { p->pos.x, p->groundY + 1.0f, p->pos.z };
 
     if (Target_Active())
     {

@@ -39,10 +39,36 @@ void World_Init(void)
     AddBox((Vector3){ -5.0f, 0.0f, 3.0f }, (Vector3){ 6.0f, 1.5f, 0.6f });
 
     AddTree((Vector3){ 4.0f, 0.0f, -4.0f }, 0.3f, 2.0f);
+
+    // Percurso de teste de alturas: escada que se sobe andando e três plataformas
+    // separadas por buracos. Correndo para fora da borda, o Mateo pula sozinho.
+    AddBox((Vector3){ 2.0f, 0.0f, 11.0f }, (Vector3){ 1.5f, 0.3f, 2.0f });
+    AddBox((Vector3){ 3.5f, 0.0f, 11.0f }, (Vector3){ 1.5f, 0.6f, 2.0f });
+    AddBox((Vector3){ 5.0f, 0.0f, 11.0f }, (Vector3){ 1.5f, 0.9f, 2.0f });
+    AddBox((Vector3){ 6.75f, 0.0f, 11.0f }, (Vector3){ 2.0f, 0.9f, 2.0f });
+    AddBox((Vector3){ 10.75f, 0.0f, 11.0f }, (Vector3){ 2.0f, 0.9f, 2.0f });
+    AddBox((Vector3){ 14.75f, 0.0f, 11.0f }, (Vector3){ 2.0f, 1.2f, 2.0f });
+}
+
+// Altura do chão embaixo de um ponto: o topo da caixa mais alta que dá para pisar
+// (no máximo STEP_UP acima da altura atual), ou 0 no chão do campo
+float World_GroundHeight(Vector3 pos)
+{
+    float ground = 0.0f;
+    for (int i = 0; i < obstacleCount; i++)
+    {
+        Obstacle *o = &obstacles[i];
+        if (o->type != SHAPE_BOX) continue;
+        if (fabsf(pos.x - o->pos.x) > o->size.x/2.0f || fabsf(pos.z - o->pos.z) > o->size.z/2.0f) continue;
+        float top = o->pos.y + o->size.y;
+        if (top <= pos.y + STEP_UP && top > ground) ground = top;
+    }
+    return ground;
 }
 
 // Empurra um círculo (o jogador visto de cima) para fora dos obstáculos.
 // Como só a parte "dentro" é corrigida, o jogador desliza ao longo das paredes.
+// Caixas baixas o bastante para subir (ou que já estão embaixo dos pés) não bloqueiam.
 Vector3 World_Collide(Vector3 pos, float radius)
 {
     for (int i = 0; i < obstacleCount; i++)
@@ -51,6 +77,8 @@ Vector3 World_Collide(Vector3 pos, float radius)
 
         if (o->type == SHAPE_BOX)
         {
+            if (o->pos.y + o->size.y <= pos.y + STEP_UP) continue;
+
             float minX = o->pos.x - o->size.x/2.0f, maxX = o->pos.x + o->size.x/2.0f;
             float minZ = o->pos.z - o->size.z/2.0f, maxZ = o->pos.z + o->size.z/2.0f;
 
@@ -114,7 +142,9 @@ void World_Draw(void)
         if (o->type == SHAPE_BOX)
         {
             Vector3 center = { o->pos.x, o->pos.y + o->size.y/2.0f, o->pos.z };
-            DrawCube(center, o->size.x, o->size.y, o->size.z, GRAY);
+            // Degraus e plataformas em pedra clara, para se destacarem dos pilares
+            Color stone = (o->size.y < 1.4f) ? (Color){ 165, 145, 110, 255 } : GRAY;
+            DrawCube(center, o->size.x, o->size.y, o->size.z, stone);
             DrawCubeWires(center, o->size.x, o->size.y, o->size.z, DARKGRAY);
         }
         else

@@ -38,6 +38,9 @@ typedef struct Player {
     float rollTimer;    // tempo desde o início do rolamento
     float chargeTime;   // tempo carregando o golpe giratório
     float spinTimer;    // tempo desde o início do golpe giratório
+    float velY;         // velocidade vertical (pulos e quedas)
+    bool grounded;      // pisando em algum chão
+    float groundY;      // altura do chão embaixo do jogador (para a sombra)
 } Player;
 
 typedef struct GameCamera {
@@ -65,8 +68,10 @@ bool Input_AttackHeld(void);
 bool Input_Shield(void);
 
 // Mundo (world.c)
+#define STEP_UP 0.45f   // degrau mais alto que se sobe só andando
 void World_Init(void);
 Vector3 World_Collide(Vector3 pos, float radius);
+float World_GroundHeight(Vector3 pos);
 void World_Draw(void);
 
 // Jogador (player.c)
