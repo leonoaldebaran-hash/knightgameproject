@@ -27,6 +27,8 @@ typedef enum PlayerState {
     PSTATE_ROLL,     // rolamento para a frente (sem a mira)
     PSTATE_CHARGE,   // segurando o botão de ataque: carregando o golpe giratório
     PSTATE_SPIN,     // golpe giratório
+    PSTATE_CLIMB,    // subindo numa borda (escalada baixa, alta ou pulando para agarrar)
+    PSTATE_JUMPATTACK, // golpe com pulo (mira travada + ação para a frente)
 } PlayerState;
 
 typedef struct Player {
@@ -52,6 +54,11 @@ typedef struct Player {
     float velY;         // velocidade vertical (pulos e quedas)
     bool grounded;      // pisando em algum chão
     float groundY;      // altura do chão embaixo do jogador (para a sombra)
+    float ledgeTimer;   // tempo empurrando uma parede com borda (para subir nela)
+    Vector3 climbFrom, climbTo;   // escalada: de onde sai e onde termina (em cima da borda)
+    float climbTimer, climbTime;
+    float jumpAttackTimer;
+    float landTimer;    // tempo desde que o golpe com pulo aterrissou (-1 = ainda no ar)
 } Player;
 
 typedef struct GameCamera {
@@ -87,6 +94,7 @@ bool Input_Shield(void);
 void World_Init(void);
 Vector3 World_Collide(Vector3 pos, float radius);
 float World_GroundHeight(Vector3 pos);
+bool World_LedgeAhead(Vector3 pos, float angle, float *top, Vector3 *standPoint);
 void World_Draw(void);
 
 // Jogador (player.c)
@@ -99,14 +107,14 @@ HitResult Player_TakeHit(Player *p, Vector3 from, int damage);
 // Soldados inimigos (soldier.c)
 void Soldiers_Init(void);
 void Soldiers_Update(Player *p, float dt);
-int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId);
+int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId, int damage);
 Vector3 Soldiers_Collide(Vector3 pos, float radius);
 void Soldiers_Draw(void);
 
 // Bonecos de treino (dummy.c)
 void Dummies_Init(void);
 void Dummies_Update(float dt);
-int Dummies_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId);
+int Dummies_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId, int damage);
 Vector3 Dummies_Collide(Vector3 pos, float radius);
 void Dummies_Draw(void);
 int Dummies_TotalHits(void);

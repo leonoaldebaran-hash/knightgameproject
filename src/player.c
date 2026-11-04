@@ -199,7 +199,21 @@ static bool TryDodge(Player *p, Vector3 wishDir)
         p->vel = Vector3Scale(left, (side > 0.0f) ? SIDEHOP_SPEED : -SIDEHOP_SPEED);
         p->velY = SIDEHOP_UP;
     }
-    else return false;   // para a frente: no futuro, o golpe com pulo
+    else if (forward > 0.5f)
+    {
+        // Golpe com pulo: mesmo impulso do mortal (6,0 / 5,8), mas para a frente, com a espada no alto
+        p->vel = Vector3Scale(toTarget, BACKFLIP_SPEED);
+        p->velY = BACKFLIP_UP;
+        p->grounded = false;
+        p->angle = a;
+        p->state = PSTATE_JUMPATTACK;
+        p->jumpAttackTimer = 0.0f;
+        p->landTimer = -1.0f;
+        p->attackId++;
+        Sfx_Play(SFX_VOICE_ATTACK);
+        return true;
+    }
+    else return false;
 
     p->grounded = false;
     p->angle = a;
@@ -207,6 +221,102 @@ static bool TryDodge(Player *p, Vector3 wishDir)
     p->dodgeTimer = 0.0f;
     Sfx_Play(SFX_SWING);
     return true;
+}
+
+#define JUMPATTACK_RECOVER 0.25f   // tempo agachado depois de aterrissar o golpe com pulo
+
+// Golpe com pulo: a lâmina desce durante a queda e acerta com dano dobrado
+static void UpdateJumpAttack(Player *p, float dt)
+{
+    p->jumpAttackTimer += dt;
+    if (p->velY < 0.0f || p->grounded)
+    {
+        int hits = Dummies_Hit(p->pos, p->angle, 2.0f, 40.0f*DEG2RAD, p->attackId, 2)
+                 + Soldiers_Hit(p->pos, p->angle, 2.0f, 40.0f*DEG2RAD, p->attackId, 2);
+        if (hits > 0) Sfx_Play(SFX_HIT);
+    }
+    if (p->grounded && p->jumpAttackTimer > 0.1f)
+    {
+        if (p->landTimer < 0.0f) { p->landTimer = 0.0f; Sfx_Play(SFX_SWING); }
+        p->landTimer += dt;
+        p->vel = Vector3MoveTowards(p->vel, Vector3Zero(), DECEL*2.0f*dt);
+        if (p->landTimer >= JUMPATTACK_RECOVER) p->state = PSTATE_NORMAL;
+    }
+}
+
+// Subir numa borda, com as alturas do Link adulto no Ocarina:
+// até 18 sobe andando; 18–41 pulinho; 41–59 escalada baixa; 59–79,4 escalada alta;
+// 79,4–111 pula e agarra a borda; acima disso é parede
+#define LEDGE_HOP       OOT_DIST(41.0f)
+#define LEDGE_CLIMB_LOW OOT_DIST(59.0f)
+#define LEDGE_CLIMB_HI  OOT_DIST(79.4f)
+#define LEDGE_MAX       OOT_DIST(111.0f)
+#define LEDGE_HOP_PUSH  OOT_FRAMES(3.0f)    // empurrando a parede esse tempo, dá o pulinho
+#define LEDGE_PUSH      OOT_FRAMES(6.0f)    // empurrando esse tempo, escala
+
+static bool TryLedge(Player *p, Vector3 wishDir, float dt)
+{
+    float top;
+    Vector3 stand;
+    bool pushing = Vector3Length(wishDir) > 0.5f &&
+                   fabsf(WrapAngle(atan2f(wishDir.x, wishDir.z) - p->angle)) < 35.0f*DEG2RAD;
+
+    if (!p->grounded || !pushing || !World_LedgeAhead(p->pos, p->angle, &top, &stand) || top - p->pos.y > LEDGE_MAX)
+    {
+        p->ledgeTimer = 0.0f;
+        return false;
+    }
+
+    p->ledgeTimer += dt;
+    float height = top - p->pos.y;
+
+    if (height < LEDGE_HOP)
+    {
+        if (p->ledgeTimer < LEDGE_HOP_PUSH) return false;
+        // Pulinho para cima da borda: impulso 0,08 x altura + 5,5 e um passo de 2,5 para a frente
+        p->velY = OOT_SPEED(height/OOT_UNIT*0.08f + 5.5f);
+        p->vel = Vector3Scale((Vector3){ sinf(p->angle), 0.0f, cosf(p->angle) }, OOT_SPEED(2.5f));
+        p->grounded = false;
+        p->ledgeTimer = 0.0f;
+        Sfx_Play(SFX_VOICE_ATTACK);
+        return true;
+    }
+
+    if (p->ledgeTimer < LEDGE_PUSH) return false;
+
+    // Escalada: baixa, alta, ou pular e agarrar a borda antes de se puxar
+    p->state = PSTATE_CLIMB;
+    p->climbFrom = p->pos;
+    p->climbTo = stand;
+    p->climbTimer = 0.0f;
+    p->climbTime = (height < LEDGE_CLIMB_LOW) ? 0.6f : (height < LEDGE_CLIMB_HI) ? 0.8f : 1.3f;
+    p->vel = Vector3Zero();
+    p->ledgeTimer = 0.0f;
+    Sfx_Play(SFX_VOICE_ATTACK);
+    return true;
+}
+
+// A escalada sobe primeiro e depois avança para cima da borda
+static void UpdateClimb(Player *p, float dt)
+{
+    p->climbTimer += dt;
+    float t = fminf(p->climbTimer/p->climbTime, 1.0f);
+    float rise = fminf(t/0.65f, 1.0f);
+    float advance = fmaxf((t - 0.65f)/0.35f, 0.0f);
+
+    p->pos.y = Lerp(p->climbFrom.y, p->climbTo.y, 1.0f - (1.0f - rise)*(1.0f - rise));
+    p->pos.x = Lerp(p->climbFrom.x, p->climbTo.x, advance);
+    p->pos.z = Lerp(p->climbFrom.z, p->climbTo.z, advance);
+    p->groundY = p->climbTo.y;
+
+    if (t >= 1.0f)
+    {
+        p->pos = p->climbTo;
+        p->grounded = true;
+        p->velY = 0.0f;
+        p->state = PSTATE_NORMAL;
+        p->climbTimer = 0.0f;
+    }
 }
 
 static void UpdateDodge(Player *p, float dt)
@@ -263,8 +373,8 @@ static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool sh
 
     if (t >= a->hitStart && t <= a->hitEnd)
     {
-        int hits = Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId)
-                 + Soldiers_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId);
+        int hits = Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId, 1)
+                 + Soldiers_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId, 1);
         if (hits > 0) Sfx_Play(SFX_HIT);
     }
 
@@ -329,8 +439,8 @@ static void UpdateSpin(Player *p, float dt)
 
     if (t >= 0.1f && t <= 0.9f)
     {
-        int hits = Dummies_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId)
-                 + Soldiers_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId);
+        int hits = Dummies_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId, 2)
+                 + Soldiers_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId, 2);
         if (hits > 0) Sfx_Play(SFX_HIT);
     }
     if (t >= 1.0f) p->state = PSTATE_NORMAL;
@@ -402,7 +512,15 @@ void Player_Update(Player *p, float camYaw, float dt)
             else if (Target_Active() && dodgePressed && TryDodge(p, wishDir)) break;
             else if (!Target_Active() && dodgePressed && Vector3Length(wishDir) > 0.3f) StartRoll(p, wishDir);
             else if (Target_Active()) UpdateLocked(p, wishDir, dt);
-            else UpdateNormal(p, wishDir, dt);
+            else if (!TryLedge(p, wishDir, dt)) UpdateNormal(p, wishDir, dt);
+            break;
+
+        case PSTATE_CLIMB:
+            UpdateClimb(p, dt);
+            return;   // a escalada controla a posição sozinha, sem colisão nem gravidade
+
+        case PSTATE_JUMPATTACK:
+            UpdateJumpAttack(p, dt);
             break;
 
         case PSTATE_DODGE:
@@ -511,6 +629,14 @@ void Player_Draw(const Player *p)
             rlTranslatef(0.0f, -0.7f, 0.0f);
         }
 
+        // Escalando: corpo inclinado para a frente, sobre a borda
+        if (p->state == PSTATE_CLIMB)
+        {
+            rlTranslatef(0.0f, 0.7f, 0.0f);
+            rlRotatef(25.0f, 1.0f, 0.0f, 0.0f);
+            rlTranslatef(0.0f, -0.7f, 0.0f);
+        }
+
         // Rolamento: cambalhota para a frente, bem rente ao chão
         if (p->state == PSTATE_ROLL)
         {
@@ -558,6 +684,16 @@ void Player_Draw(const Player *p)
                 rlRotatef(-140.0f, 0.0f, 1.0f, 0.0f);
                 DrawCube((Vector3){ 0.0f, 0.0f, 0.6f }, 0.06f, 0.06f, 1.0f, blade);
                 if (ready) DrawSphere((Vector3){ 0.0f, 0.0f, 1.1f }, 0.12f, Fade(YELLOW, 0.7f));
+            rlPopMatrix();
+        }
+        else if (p->state == PSTATE_JUMPATTACK)
+        {
+            // Espada no alto subindo; desce cortando na queda e fica embaixo ao aterrissar
+            float pitch = (p->landTimer >= 0.0f) ? 40.0f : Clamp(-120.0f - p->velY*25.0f, -120.0f, 40.0f);
+            rlPushMatrix();
+                rlTranslatef(-0.3f, 1.2f, 0.1f);
+                rlRotatef(pitch, 1.0f, 0.0f, 0.0f);
+                DrawCube((Vector3){ 0.0f, 0.0f, 0.6f }, 0.06f, 0.06f, 1.1f, (Color){ 255, 240, 160, 255 });
             rlPopMatrix();
         }
         else if (p->state == PSTATE_SPIN)

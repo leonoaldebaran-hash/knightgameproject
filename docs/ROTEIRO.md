@@ -27,11 +27,13 @@ O Ocarina roda a lógica a 20 quadros por segundo. As macros `OOT_DIST`, `OOT_SP
 | Movimento | corrida 6,0/quadro, acelera 2,0, freia 1,5, giro 2000/quadro, gravidade 1,0 | `player.c` |
 | Borda | sempre sai pulando: >5,9 pula 7,5; devagar 1,25 + 0,2 x velocidade | `player.c` |
 | Esquivas | salto lateral 8,5 / 3,5; mortal 6,0 / 5,8; rolamento 1,5x a velocidade (mín. 3), 16 quadros | `player.c` |
+| Bordas e escalada | até 18 sobe andando; 18–41 pulinho; 41–59 escalada baixa; 59–79,4 alta; 79,4–111 pula e agarra; empurrar 3/6 quadros | `player.c`, `world.c` |
+| Golpe com pulo | mira + ação para a frente: impulso 6,0 / 5,8, dano dobrado (giratório também é dobrado) | `player.c` |
 | Câmera | NORMAL (distância elástica 200–300, 10°, FOV 60, gira só andando), PARALELO (250, FOV 45), BATALHA (180, FOV 50) | `camera.c` |
 | Música | tocadores principal e de inimigo, volume pela distância (150–500), modo parado, retomada | `music.c` |
 
-**Ainda falta trazer para o modelo do Ocarina:** agarrar bordas e escalar, andar para trás com a mira,
-virada rápida (quando o direcional inverte), golpe com pulo, colisão por polígonos com tipos de
+**Ainda falta trazer para o modelo do Ocarina:** ficar pendurado ao cair de costas de uma borda,
+andar para trás com a mira, virada rápida (quando o direcional inverte), colisão por polígonos com tipos de
 superfície, colisores de ataque, dano e empurrão, sistema de atores, cenas e salas, HUD com os botões, fanfarras.
 
 **Assets que o autor gera em outras IAs, quando o Claude pedir:** músicas (Suno, com prompt escrito

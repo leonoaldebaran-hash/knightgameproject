@@ -56,7 +56,7 @@ void Dummies_Update(float dt)
 }
 
 // Verifica quais bonecos estão dentro do arco do golpe. Retorna quantos foram acertados.
-int Dummies_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId)
+int Dummies_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId, int damage)
 {
     int hits = 0;
     for (int i = 0; i < MAX_DUMMIES; i++)
@@ -73,7 +73,7 @@ int Dummies_Hit(Vector3 origin, float angle, float reach, float halfArc, int att
         if (dist > DUMMY_RADIUS + 0.3f && fabsf(WrapAngle(dirAngle - angle)) > halfArc) continue;
 
         d->lastHitId = attackId;
-        d->hp--;
+        d->hp -= damage;
         d->flash = 0.15f;
         d->tiltDir = dirAngle;
         d->wobbleVel += WOBBLE_KICK;

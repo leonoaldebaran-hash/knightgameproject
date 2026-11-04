@@ -188,7 +188,7 @@ void Soldiers_Update(Player *p, float dt)
     for (int i = 0; i < MAX_SOLDIERS; i++) UpdateSoldier(&soldiers[i], p, dt);
 }
 
-int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId)
+int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId, int damage)
 {
     int hits = 0;
     for (int i = 0; i < MAX_SOLDIERS; i++)
@@ -205,7 +205,7 @@ int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int at
 
         // Levar um golpe interrompe o que o soldado estava fazendo, inclusive o ataque
         s->lastHitId = attackId;
-        s->hp--;
+        s->hp -= damage;
         s->flash = 0.15f;
         s->vel = Vector3Scale((Vector3){ sinf(dirAngle), 0.0f, cosf(dirAngle) }, 5.0f);
         SetState(s, (s->hp <= 0) ? SOLDIER_DEAD : SOLDIER_HURT);

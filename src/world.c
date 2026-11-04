@@ -48,6 +48,37 @@ void World_Init(void)
     AddBox((Vector3){ 6.75f, 0.0f, 11.0f }, (Vector3){ 2.0f, 0.9f, 2.0f });
     AddBox((Vector3){ 10.75f, 0.0f, 11.0f }, (Vector3){ 2.0f, 0.9f, 2.0f });
     AddBox((Vector3){ 14.75f, 0.0f, 11.0f }, (Vector3){ 2.0f, 1.2f, 2.0f });
+
+    // Blocos de escalada atrás do ponto de início, um de cada altura do Ocarina:
+    // pulinho (0,8), escalada baixa (1,3), escalada alta (1,8), pular e agarrar (2,5), parede (3,2)
+    const float heights[5] = { 0.8f, 1.3f, 1.8f, 2.5f, 3.2f };
+    for (int i = 0; i < 5; i++)
+        AddBox((Vector3){ -6.0f + i*3.0f, 0.0f, 15.5f }, (Vector3){ 1.8f, heights[i], 1.8f });
+}
+
+// Há uma borda logo à frente? Procura uma caixa mais alta que um degrau na direção em que o
+// jogador olha. top recebe a altura do topo e standPoint o lugar onde ele fica em pé lá em cima.
+bool World_LedgeAhead(Vector3 pos, float angle, float *top, Vector3 *standPoint)
+{
+    Vector3 dir = { sinf(angle), 0.0f, cosf(angle) };
+    Vector3 probe = Vector3Add(pos, Vector3Scale(dir, 0.55f));
+    bool found = false;
+
+    for (int i = 0; i < obstacleCount; i++)
+    {
+        Obstacle *o = &obstacles[i];
+        if (o->type != SHAPE_BOX) continue;
+        if (fabsf(probe.x - o->pos.x) > o->size.x/2.0f || fabsf(probe.z - o->pos.z) > o->size.z/2.0f) continue;
+        float t = o->pos.y + o->size.y;
+        if (t <= pos.y + STEP_UP) continue;
+        if (!found || t > *top) { *top = t; found = true; }
+    }
+    if (!found) return false;
+
+    // Lugar para ficar em pé: um pouco para dentro da borda, e precisa ser o topo dessa altura
+    *standPoint = Vector3Add(pos, Vector3Scale(dir, 0.95f));
+    standPoint->y = *top;
+    return World_GroundHeight(*standPoint) >= *top - 0.01f;
 }
 
 // Altura do chão embaixo de um ponto: o topo da caixa mais alta que dá para pisar
