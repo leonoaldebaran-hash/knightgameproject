@@ -1,13 +1,14 @@
 #include "game.h"
 #include "rlgl.h"
 
-#define RUN_SPEED   6.0f   // velocidade máxima (unidades por segundo)
-#define ACCEL      30.0f   // aceleração ao começar a andar
-#define DECEL      40.0f   // freio ao soltar o direcional
-#define TURN_SPEED 12.0f   // rapidez para virar na direção do movimento
+// Movimento com os números do Link (bota comum, adulto) no Ocarina
+#define RUN_SPEED   OOT_SPEED(6.0f)    // limite de corrida: 6 unidades/quadro
+#define ACCEL       OOT_ACCEL(2.0f)    // acelera 2,0 por quadro
+#define DECEL       OOT_ACCEL(1.5f)    // freia 1,5 por quadro
+#define TURN_RATE   OOT_TURN(2000)     // gira até ~11° por quadro (~220°/s), em passo fixo
 
 #define ATTACK_TIME   0.22f   // duração de cada golpe (segundos)
-#define ATTACK_LUNGE  3.0f    // passo à frente no início do golpe
+#define ATTACK_LUNGE  1.8f    // passo à frente no início do golpe
 #define CANCEL_POINT  0.35f   // a partir de que ponto do golpe (0 a 1) um novo aperto já corta para o próximo
 #define SHIELD_TURN   10.0f   // rapidez para virar com o escudo levantado
 #define SHIELD_ARC    (75.0f*DEG2RAD)   // golpes vindos até esse ângulo da frente são defendidos
@@ -18,27 +19,30 @@
 #define INVULN_TIME   1.0f    // tempo piscando sem levar dano
 #define BLOCK_PUSH    3.0f    // empurrão ao defender com o escudo
 
-#define STRAFE_SPEED  4.5f    // andando em volta do alvo com a mira travada
+#define STRAFE_SPEED  RUN_SPEED   // com a mira travada anda no mesmo limite, sempre de frente para o alvo
 #define LOCK_TURN     15.0f   // rapidez para virar de frente para o alvo
-#define SIDEHOP_TIME  0.35f
-#define SIDEHOP_SPEED 9.0f
-#define SIDEHOP_HIGH  0.5f
+#define SIDEHOP_TIME  0.35f   // só para a animação (a duração real vem da gravidade)
+#define SIDEHOP_SPEED OOT_SPEED(8.5f)   // salto lateral: 8,5 para o lado, 3,5 para cima
+#define SIDEHOP_UP    OOT_SPEED(3.5f)
 #define BACKFLIP_TIME 0.45f
-#define BACKFLIP_SPEED 7.5f
-#define BACKFLIP_HIGH 1.0f
+#define BACKFLIP_SPEED OOT_SPEED(6.0f)  // mortal: 6,0 para trás, 5,8 para cima
+#define BACKFLIP_UP   OOT_SPEED(5.8f)
 
-#define ROLL_TIME     0.45f   // duração do rolamento
-#define ROLL_SPEED    9.0f
-#define ROLL_SAFE     0.30f   // começo do rolamento em que o jogador não leva dano
+// Rolamento: 1,5x a velocidade de andar (mínimo 3), ~16 quadros, invulnerável num trecho do meio
+#define ROLL_TIME     OOT_FRAMES(16.0f)
+#define ROLL_MIN      OOT_SPEED(3.0f)
+#define ROLL_SAFE_START OOT_FRAMES(6.4f)
+#define ROLL_SAFE_END   OOT_FRAMES(16.4f)
 
-#define GRAVITY       25.0f   // queda (unidades por segundo²)
-#define JUMP_VEL      6.5f    // impulso do pulo automático (~0,85 de altura)
-#define AUTOJUMP_SPEED 4.5f   // acima dessa velocidade, sair de uma borda vira pulo
+#define GRAVITY       OOT_ACCEL(1.0f)   // gravidade do Link: 1,0 por quadro²
+// Pulo ao sair de uma borda: rápido (acima de 5,9) pula 7,5; devagar dá um pulinho 1,25 + 0,2 x velocidade
+#define LEDGE_FAST    OOT_SPEED(5.9f)
+#define LEDGE_JUMP    OOT_SPEED(7.5f)
 #define STEP_DOWN     0.3f    // descer até isso continua "pisando" (degraus)
 #define AIR_CONTROL   0.35f   // quanto dá para corrigir a direção no ar
 
 #define CHARGE_TIME   0.7f   // segurando o ataque esse tempo, o golpe giratório fica pronto
-#define CHARGE_SPEED  1.8f    // dá para andar devagar enquanto carrega
+#define CHARGE_SPEED  1.0f    // dá para andar devagar enquanto carrega
 #define SPIN_TIME     0.40f   // duração do golpe giratório
 #define SPIN_REACH    2.3f    // alcance em volta do jogador
 
@@ -72,7 +76,7 @@ HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
 {
     // Durante a esquiva o jogador não leva dano: é o momento de escapar do golpe
     if (p->invulnTimer > 0.0f || p->state == PSTATE_HURT || p->state == PSTATE_DODGE) return HIT_IGNORED;
-    if (p->state == PSTATE_ROLL && p->rollTimer < ROLL_SAFE) return HIT_IGNORED;
+    if (p->state == PSTATE_ROLL && p->rollTimer >= ROLL_SAFE_START && p->rollTimer <= ROLL_SAFE_END) return HIT_IGNORED;
 
     float dx = from.x - p->pos.x, dz = from.z - p->pos.z;
     float toAttacker = atan2f(dx, dz);
@@ -132,6 +136,14 @@ static void TurnTowards(Player *p, float targetAngle, float speed, float dt)
     p->angle = WrapAngle(p->angle + WrapAngle(targetAngle - p->angle)*fminf(1.0f, speed*dt));
 }
 
+// Giro em passo fixo, como o Link: no máximo `rate` radianos por segundo
+static void TurnLinear(Player *p, float targetAngle, float rate, float dt)
+{
+    float diff = WrapAngle(targetAngle - p->angle);
+    float step = rate*dt;
+    p->angle = WrapAngle(p->angle + Clamp(diff, -step, step));
+}
+
 static float AngleToTarget(const Player *p)
 {
     Vector3 t = Target_Pos();
@@ -178,14 +190,14 @@ static bool TryDodge(Player *p, Vector3 wishDir)
     {
         p->dodgeBack = true;
         p->vel = Vector3Scale(toTarget, -BACKFLIP_SPEED);
-        p->velY = sqrtf(2.0f*GRAVITY*BACKFLIP_HIGH);
+        p->velY = BACKFLIP_UP;
     }
     else if (fabsf(side) > 0.3f)
     {
         p->dodgeBack = false;
         p->dodgeSide = (side > 0.0f) ? -1.0f : 1.0f;
         p->vel = Vector3Scale(left, (side > 0.0f) ? SIDEHOP_SPEED : -SIDEHOP_SPEED);
-        p->velY = sqrtf(2.0f*GRAVITY*SIDEHOP_HIGH);
+        p->velY = SIDEHOP_UP;
     }
     else return false;   // para a frente: no futuro, o golpe com pulo
 
@@ -218,8 +230,8 @@ static void UpdateNormal(Player *p, Vector3 wishDir, float dt)
     if (!p->grounded) rate *= AIR_CONTROL;   // no ar dá para corrigir só um pouco
     p->vel = Vector3MoveTowards(p->vel, targetVel, rate*dt);
 
-    // Vira suavemente para a direção em que está andando
-    if (Vector3Length(p->vel) > 0.1f) TurnTowards(p, atan2f(p->vel.x, p->vel.z), TURN_SPEED, dt);
+    // Vira para onde o direcional aponta, em passo fixo
+    if (Vector3Length(wishDir) > 0.1f) TurnLinear(p, atan2f(wishDir.x, wishDir.z), TURN_RATE, dt);
 }
 
 static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool shieldHeld, float dt)
@@ -264,26 +276,23 @@ static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool sh
     }
 }
 
-// Rolamento: corre e rola para onde o direcional aponta
+// Rolamento: rola para onde o personagem já está virado
 static void StartRoll(Player *p, Vector3 wishDir)
 {
-    p->angle = atan2f(wishDir.x, wishDir.z);
+    (void)wishDir;
     p->state = PSTATE_ROLL;
     p->rollTimer = 0.0f;
     Sfx_Play(SFX_SWING);
 }
 
-static void UpdateRoll(Player *p, float dt)
+// Velocidade do rolamento: 1,5x o que o direcional daria andando, nunca menos que o mínimo
+static void UpdateRoll(Player *p, Vector3 wishDir, float dt)
 {
     p->rollTimer += dt;
-    float t = fminf(p->rollTimer/ROLL_TIME, 1.0f);
+    float speed = fmaxf(Vector3Length(wishDir)*RUN_SPEED*1.5f, ROLL_MIN);
     Vector3 facing = { sinf(p->angle), 0.0f, cosf(p->angle) };
-    p->vel = Vector3Scale(facing, ROLL_SPEED*(1.0f - 0.4f*t));
-    if (t >= 1.0f)
-    {
-        p->vel = Vector3Scale(p->vel, 0.5f);
-        p->state = PSTATE_NORMAL;
-    }
+    p->vel = Vector3MoveTowards(p->vel, Vector3Scale(facing, speed), ACCEL*dt);
+    if (p->rollTimer >= ROLL_TIME) p->state = PSTATE_NORMAL;
 }
 
 // Carregando: anda devagar com a espada para trás; soltar com a carga cheia gira
@@ -350,15 +359,17 @@ static void UpdateVertical(Player *p, float dt)
             return;
         }
 
-        // Saiu de uma borda: correndo vira pulo (como no Ocarina), andando só cai
+        // Saiu de uma borda: como no Ocarina, sempre sai pulando; correndo é um pulo de verdade,
+        // devagar é um pulinho que cresce com a velocidade
         p->grounded = false;
         float speed = sqrtf(p->vel.x*p->vel.x + p->vel.z*p->vel.z);
         bool canJump = (p->state == PSTATE_NORMAL || p->state == PSTATE_ROLL);
-        if (canJump && speed > AUTOJUMP_SPEED)
+        if (canJump && speed > LEDGE_FAST)
         {
-            p->velY = JUMP_VEL;
+            p->velY = LEDGE_JUMP;
             Sfx_Play(SFX_VOICE_ATTACK);
         }
+        else if (canJump) p->velY = OOT_SPEED(1.25f + 0.2f*speed/OOT_SPEED(1.0f));
         else p->velY = 0.0f;
     }
 
@@ -399,7 +410,7 @@ void Player_Update(Player *p, float camYaw, float dt)
             break;
 
         case PSTATE_ROLL:
-            UpdateRoll(p, dt);
+            UpdateRoll(p, wishDir, dt);
             break;
 
         case PSTATE_CHARGE:

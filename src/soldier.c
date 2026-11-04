@@ -8,8 +8,8 @@
 
 #define SIGHT_RANGE    9.0f   // distância em que nota o jogador
 #define GIVEUP_RANGE   14.0f  // distância em que desiste de perseguir
-#define PATROL_SPEED   1.5f
-#define CHASE_SPEED    3.2f   // mais lento que o jogador, para dar para fugir
+#define PATROL_SPEED   0.9f
+#define CHASE_SPEED    2.3f   // mais lento que a corrida do jogador (~3,1 m/s), para dar para fugir
 #define TURN_SPEED     6.0f
 #define ATTACK_RANGE   1.5f   // distância em que para e começa o golpe
 

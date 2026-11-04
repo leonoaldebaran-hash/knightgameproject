@@ -7,6 +7,17 @@
 #define SCREEN_W 640
 #define SCREEN_H 480
 
+// Conversão dos números do Ocarina of Time (estudados no Ship of Harkinian) para o nosso mundo.
+// O Link adulto mede 68 unidades; o Mateo ~1,75 m. O Ocarina roda a lógica a 20 quadros por segundo,
+// então velocidade "por quadro" vira "por segundo" multiplicando por 20, e aceleração por 20².
+#define OOT_UNIT        0.026f
+#define OOT_FPS         20.0f
+#define OOT_DIST(u)     ((u)*OOT_UNIT)                       // distância
+#define OOT_SPEED(u)    ((u)*OOT_FPS*OOT_UNIT)               // unidades/quadro  -> m/s
+#define OOT_ACCEL(u)    ((u)*OOT_FPS*OOT_FPS*OOT_UNIT)       // unidades/quadro² -> m/s²
+#define OOT_TURN(s16)   ((s16)/65536.0f*2.0f*PI*OOT_FPS)     // ângulo s16/quadro -> rad/s
+#define OOT_FRAMES(n)   ((n)/OOT_FPS)                        // quadros -> segundos
+
 typedef enum PlayerState {
     PSTATE_NORMAL,   // andando livre
     PSTATE_ATTACK,   // golpe de espada em andamento
@@ -46,6 +57,10 @@ typedef struct Player {
 typedef struct GameCamera {
     Camera3D cam;
     float yaw;      // ângulo da câmera em volta do jogador
+    float dist;     // distância horizontal até o foco
+    float pitch;    // inclinação para baixo (radianos)
+    float fov;      // campo de visão vertical (graus)
+    Vector3 eye;    // posição da câmera no mundo
     Vector3 focus;  // ponto que a câmera segue
 } GameCamera;
 

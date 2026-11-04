@@ -81,7 +81,8 @@ void Target_Update(const Player *p, const Camera3D *cam, float dt)
 
     hasHint = (kind == KIND_NONE) && FindBest(p, cam, &k, &i, &hintPos);
 
-    float wanted = (kind != KIND_NONE) ? 1.0f : 0.0f;
+    // Faixas de cinema com a mira travada e também com a mira segurada sem alvo, como no Ocarina
+    float wanted = (kind != KIND_NONE || Input_Target()) ? 1.0f : 0.0f;
     if (bars < wanted) bars = fminf(wanted, bars + BAR_SPEED*dt);
     else bars = fmaxf(wanted, bars - BAR_SPEED*dt);
 }

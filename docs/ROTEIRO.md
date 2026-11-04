@@ -17,8 +17,22 @@ jeito de construir dungeons. Antes de implementar um sistema, o Claude lê como 
 e reproduz a **técnica e o comportamento** com código próprio. **Nunca copia código nem assets**:
 o código do Ship of Harkinian vem da decompilação de um jogo da Nintendo.
 
-Escala: o Link tem ~50 unidades de altura no Ocarina e o Mateo ~1,5, então 1 unidade do Ocarina
-≈ 0,03 no nosso mundo (500 unidades ≈ 15).
+Escala: o Link adulto mede 68 unidades no Ocarina e o Mateo ~1,75 m, então 1 unidade ≈ 0,026 m.
+O Ocarina roda a lógica a 20 quadros por segundo. As macros `OOT_DIST`, `OOT_SPEED`, `OOT_ACCEL`,
+`OOT_TURN` e `OOT_FRAMES` em `src/game.h` convertem os números do Ocarina para o nosso mundo.
+
+### Sistemas já no modelo do Ocarina
+| Sistema | O que segue do Ocarina | Arquivo |
+|---|---|---|
+| Movimento | corrida 6,0/quadro, acelera 2,0, freia 1,5, giro 2000/quadro, gravidade 1,0 | `player.c` |
+| Borda | sempre sai pulando: >5,9 pula 7,5; devagar 1,25 + 0,2 x velocidade | `player.c` |
+| Esquivas | salto lateral 8,5 / 3,5; mortal 6,0 / 5,8; rolamento 1,5x a velocidade (mín. 3), 16 quadros | `player.c` |
+| Câmera | NORMAL (distância elástica 200–300, 10°, FOV 60, gira só andando), PARALELO (250, FOV 45), BATALHA (180, FOV 50) | `camera.c` |
+| Música | tocadores principal e de inimigo, volume pela distância (150–500), modo parado, retomada | `music.c` |
+
+**Ainda falta trazer para o modelo do Ocarina:** agarrar bordas e escalar, andar para trás com a mira,
+virada rápida (quando o direcional inverte), golpe com pulo, colisão por polígonos com tipos de
+superfície, colisores de ataque, dano e empurrão, sistema de atores, cenas e salas, HUD com os botões, fanfarras.
 
 **Assets que o autor gera em outras IAs, quando o Claude pedir:** músicas (Suno, com prompt escrito
 pelo Claude) e imagens, como fundos pré-renderizados (salas internas e lojas, como no Ocarina),

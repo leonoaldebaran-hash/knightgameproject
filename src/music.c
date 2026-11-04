@@ -27,10 +27,9 @@
 #define RAMP_SPEED     3.0f    // volume por segundo (~10 quadros para ir de 0 a 1, como no N64)
 #define LOOP_XFADE     4.0f    // segundos de mistura entre o fim e o começo da mesma faixa
 
-// Distâncias do modo inimigo: 150 e 500 unidades do Ocarina na escala do nosso mundo
-// (o Link tem ~50 unidades de altura, o Mateo ~1,5)
-#define ENEMY_NEAR     4.5f
-#define ENEMY_FAR      15.0f
+// Distâncias do modo inimigo: 150 e 500 unidades do Ocarina
+#define ENEMY_NEAR     OOT_DIST(150.0f)
+#define ENEMY_FAR      OOT_DIST(500.0f)
 
 // Modo parado: tempo parado para valer e volume da música do lugar nesse modo
 #define STILL_TIME     1.0f    // ~30 quadros
