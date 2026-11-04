@@ -8,6 +8,12 @@
 // build para OGG com o tratamento estilo N64. A música do campo cede lugar à de combate
 // quando um inimigo persegue o jogador, com troca suave entre as duas.
 
+// Versão do build (preenchida pelo GitHub Actions): vai no endereço das músicas
+// para o navegador não reaproveitar uma cópia antiga do cache
+#ifndef GAME_VERSION
+#define GAME_VERSION "dev"
+#endif
+
 #define MUSIC_VOLUME   0.7f
 #define FADE_SPEED     1.2f   // volume por segundo na troca de faixa
 #define BATTLE_HOLD    2.5f   // segundos que a música de combate continua depois da luta
@@ -55,7 +61,7 @@ void Music_Init(void)
     for (int i = 0; i < TRACK_COUNT; i++)
     {
 #if defined(PLATFORM_WEB)
-        emscripten_async_wget(TextFormat("music/%s", trackFiles[i]), TextFormat("/%s", trackFiles[i]), OnTrackDownloaded, OnTrackFailed);
+        emscripten_async_wget(TextFormat("music/%s?v=%s", trackFiles[i], GAME_VERSION), TextFormat("/%s", trackFiles[i]), OnTrackDownloaded, OnTrackFailed);
 #else
         StartTrack(i, TextFormat("assets/music/%s", trackFiles[i]));
 #endif
