@@ -70,36 +70,62 @@ void Player_Init(Player *p)
     p->radius = 0.35f;
     p->hp = p->maxHp = START_HP;
     p->grounded = true;
+
+    // O jogador é um ator da categoria PLAYER, com colisores como os outros
+    p->actor.pos = p->pos;
+    p->actor.colChk.mass = 50;
+    Actor_Register(&p->actor, ACTORCAT_PLAYER);
+
+    Collider_InitQuad(&p->swordAT, &p->actor);
+    p->swordAT.atFlags = AT_ON | AT_TYPE_PLAYER;
+    p->swordAT.damage = 1;
+    Collider_InitCylinder(&p->bodyAC, &p->actor, p->radius, 1.7f);
+    p->bodyAC.acFlags = AC_ON | AC_TYPE_ENEMY;
+    p->bodyAC.bumpDmg = DMG_BIT(DMG_ENEMY_SWORD);
+    Collider_InitCylinder(&p->shieldAC, &p->actor, 0.4f, 1.3f);
+    p->shieldAC.acFlags = AC_ON | AC_HARD | AC_TYPE_ENEMY;
+    p->shieldAC.bumpDmg = DMG_BIT(DMG_ENEMY_SWORD);
+    Collider_InitCylinder(&p->bodyOC, &p->actor, p->radius, 1.7f);
+    p->bodyOC.ocFlags = OC_ON;
 }
 
-HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
+// Durante a esquiva, o trecho do meio do rolamento e o tempo piscando, o jogador não leva dano
+static bool Invulnerable(const Player *p)
 {
-    // Durante a esquiva o jogador não leva dano: é o momento de escapar do golpe
-    if (p->invulnTimer > 0.0f || p->state == PSTATE_HURT || p->state == PSTATE_DODGE) return HIT_IGNORED;
-    if (p->state == PSTATE_ROLL && p->rollTimer >= ROLL_SAFE_START && p->rollTimer <= ROLL_SAFE_END) return HIT_IGNORED;
+    if (p->invulnTimer > 0.0f || p->state == PSTATE_HURT || p->state == PSTATE_DODGE) return true;
+    return p->state == PSTATE_ROLL && p->rollTimer >= ROLL_SAFE_START && p->rollTimer <= ROLL_SAFE_END;
+}
 
-    float dx = from.x - p->pos.x, dz = from.z - p->pos.z;
-    float toAttacker = atan2f(dx, dz);
-    Vector3 away = Vector3Normalize((Vector3){ -dx, 0.0f, -dz });
-
-    // Escudo levantado e virado para o atacante: defende
-    if (p->state == PSTATE_SHIELD && fabsf(WrapAngle(toAttacker - p->angle)) < SHIELD_ARC)
+// Lê o resultado das colisões do quadro anterior: escudo, dano e acertos da espada
+static void ReactToCollisions(Player *p)
+{
+    if (p->shieldAC.acFlags & AC_BOUNCED)
     {
-        p->vel = Vector3Scale(away, BLOCK_PUSH);
+        Vector3 from = p->shieldAC.acHit ? p->shieldAC.acHit->pos : p->pos;
+        Vector3 away = Vector3Subtract(p->pos, from);
+        away.y = 0.0f;
+        p->vel = Vector3Scale(Vector3Normalize(away), BLOCK_PUSH);
         p->blockFlash = 0.12f;
         Sfx_Play(SFX_BLOCK);
-        return HIT_BLOCKED;
     }
+    else if ((p->bodyAC.acFlags & AC_HIT) && !Invulnerable(p))
+    {
+        Vector3 from = p->bodyAC.acHit ? p->bodyAC.acHit->pos : p->pos;
+        Vector3 away = Vector3Subtract(p->pos, from);
+        away.y = 0.0f;
+        Sfx_Play(SFX_HURT);
+        Sfx_Play(SFX_VOICE_HURT);
+        p->hp -= p->bodyAC.acHitDamage;
+        p->state = PSTATE_HURT;
+        p->hurtTimer = 0.0f;
+        p->vel = Vector3Scale(Vector3Normalize(away), HURT_PUSH);
+        p->invulnTimer = INVULN_TIME;
+    }
+    if (p->swordAT.atFlags & AT_HIT) Sfx_Play(SFX_HIT);
 
-    Sfx_Play(SFX_HURT);
-    Sfx_Play(SFX_VOICE_HURT);
-
-    p->hp -= damage;
-    p->state = PSTATE_HURT;
-    p->hurtTimer = 0.0f;
-    p->vel = Vector3Scale(away, HURT_PUSH);
-    p->invulnTimer = INVULN_TIME;
-    return HIT_TAKEN;
+    p->shieldAC.acFlags &= ~(AC_HIT | AC_BOUNCED);
+    p->bodyAC.acFlags &= ~AC_HIT;
+    p->swordAT.atFlags &= ~(AT_HIT | AT_BOUNCED);
 }
 
 static void UpdateHurt(Player *p, float dt)
@@ -229,12 +255,6 @@ static bool TryDodge(Player *p, Vector3 wishDir)
 static void UpdateJumpAttack(Player *p, float dt)
 {
     p->jumpAttackTimer += dt;
-    if (p->velY < 0.0f || p->grounded)
-    {
-        int hits = Dummies_Hit(p->pos, p->angle, 2.0f, 40.0f*DEG2RAD, p->attackId, 2)
-                 + Soldiers_Hit(p->pos, p->angle, 2.0f, 40.0f*DEG2RAD, p->attackId, 2);
-        if (hits > 0) Sfx_Play(SFX_HIT);
-    }
     if (p->grounded && p->jumpAttackTimer > 0.1f)
     {
         if (p->landTimer < 0.0f) { p->landTimer = 0.0f; Sfx_Play(SFX_SWING); }
@@ -370,13 +390,7 @@ static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool sh
     Vector3 facing = { sinf(p->angle), 0.0f, cosf(p->angle) };
     if (t < 0.4f) p->vel = Vector3Scale(facing, ATTACK_LUNGE);
     else p->vel = Vector3MoveTowards(p->vel, Vector3Zero(), DECEL*dt);
-
-    if (t >= a->hitStart && t <= a->hitEnd)
-    {
-        int hits = Dummies_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId, 1)
-                 + Soldiers_Hit(p->pos, p->angle, a->reach, a->halfArc, p->attackId, 1);
-        if (hits > 0) Sfx_Play(SFX_HIT);
-    }
+    (void)a;   // o dano é feito pelo colisor da lâmina (BladeSegment)
 
     // Golpe terminou com o botão ainda segurado: começa a carregar o golpe giratório
     if (t >= 1.0f)
@@ -436,13 +450,6 @@ static void UpdateSpin(Player *p, float dt)
     p->spinTimer += dt;
     float t = p->spinTimer/SPIN_TIME;
     p->vel = Vector3MoveTowards(p->vel, Vector3Zero(), DECEL*dt);
-
-    if (t >= 0.1f && t <= 0.9f)
-    {
-        int hits = Dummies_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId, 2)
-                 + Soldiers_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId, 2);
-        if (hits > 0) Sfx_Play(SFX_HIT);
-    }
     if (t >= 1.0f) p->state = PSTATE_NORMAL;
 }
 
@@ -493,8 +500,12 @@ static void UpdateVertical(Player *p, float dt)
     }
 }
 
+static void RegisterColliders(Player *p);
+
 void Player_Update(Player *p, float camYaw, float dt)
 {
+    ReactToCollisions(p);
+
     Vector3 wishDir = WishDirection(camYaw);
     bool attackPressed = Input_Attack();
     bool shieldHeld = Input_Shield();
@@ -556,9 +567,18 @@ void Player_Update(Player *p, float camYaw, float dt)
 
     p->pos = Vector3Add(p->pos, Vector3Scale(p->vel, dt));
     p->pos = World_Collide(p->pos, p->radius);
-    p->pos = Dummies_Collide(p->pos, p->radius);
-    p->pos = Soldiers_Collide(p->pos, p->radius);
     UpdateVertical(p, dt);
+    RegisterColliders(p);
+}
+
+// Depois da checagem de colisões: aplica o empurrão dos corpos (OC) e volta a respeitar as paredes
+void Player_AfterCollision(Player *p)
+{
+    p->pos.x += p->actor.colChk.displacement.x;
+    p->pos.z += p->actor.colChk.displacement.z;
+    p->actor.colChk.displacement = Vector3Zero();
+    p->pos = World_Collide(p->pos, p->radius);
+    p->actor.pos = p->pos;
 }
 
 // Ângulo da espada (graus, em volta do ombro) durante o golpe. Positivo = lado esquerdo.
@@ -568,6 +588,83 @@ static float SwingAngle(const Player *p, float t)
     if (p->attackStep == 0) return Lerp(-80.0f, 80.0f, e);
     if (p->attackStep == 1) return Lerp(80.0f, -80.0f, e);
     return 0.0f;
+}
+
+// Onde está a lâmina no mundo agora, e que tipo de dano ela causa.
+// Falso quando a espada não está machucando (fora do trecho ativo do golpe).
+static bool BladeSegment(const Player *p, Vector3 *base, Vector3 *tip, unsigned *dmg)
+{
+    Vector3 shoulder = Vector3Add(p->pos, (Vector3){ 0.0f, 0.9f, 0.0f });
+
+    if (p->state == PSTATE_ATTACK)
+    {
+        const AttackInfo *a = &attacks[p->attackStep];
+        float t = fminf(p->attackTimer/ATTACK_TIME, 1.0f);
+        if (t < a->hitStart || t > a->hitEnd) return false;
+        float yaw = p->angle + SwingAngle(p, t)*DEG2RAD;
+        float thrust = (p->attackStep == 2) ? sinf(t*PI)*0.6f : 0.0f;
+        Vector3 dir = { sinf(yaw), 0.0f, cosf(yaw) };
+        *base = Vector3Add(shoulder, Vector3Scale(dir, 0.25f + thrust));
+        *tip = Vector3Add(shoulder, Vector3Scale(dir, a->reach - 0.4f + thrust));
+        *dmg = DMG_BIT(DMG_SLASH);
+        return true;
+    }
+    if (p->state == PSTATE_SPIN)
+    {
+        float t = fminf(p->spinTimer/SPIN_TIME, 1.0f);
+        if (t < 0.1f || t > 0.9f) return false;
+        float turn = 360.0f*(1.0f - (1.0f - t)*(1.0f - t));
+        float yaw = p->angle + turn*DEG2RAD - PI/2.0f;   // lâmina esticada para o lado direito
+        Vector3 dir = { sinf(yaw), 0.0f, cosf(yaw) };
+        shoulder.y = p->pos.y + 0.8f;
+        *base = Vector3Add(shoulder, Vector3Scale(dir, 0.4f));
+        *tip = Vector3Add(shoulder, Vector3Scale(dir, SPIN_REACH - 0.3f));
+        *dmg = DMG_BIT(DMG_SPIN);
+        return true;
+    }
+    if (p->state == PSTATE_JUMPATTACK)
+    {
+        bool falling = p->velY < 0.0f && p->landTimer < 0.0f;
+        bool justLanded = p->landTimer >= 0.0f && p->landTimer < 0.12f;
+        if (!falling && !justLanded) return false;
+        float pitch = (p->landTimer >= 0.0f ? 40.0f : Clamp(-120.0f - p->velY*25.0f, -120.0f, 40.0f))*DEG2RAD;
+        Vector3 fwd = { sinf(p->angle), 0.0f, cosf(p->angle) };
+        Vector3 dir = Vector3Add(Vector3Scale(fwd, cosf(pitch)), (Vector3){ 0.0f, -sinf(pitch), 0.0f });
+        Vector3 pivot = Vector3Add(p->pos, (Vector3){ 0.0f, 1.2f, 0.0f });
+        *base = Vector3Add(pivot, Vector3Scale(dir, 0.1f));
+        *tip = Vector3Add(pivot, Vector3Scale(dir, 1.6f));
+        *dmg = DMG_BIT(DMG_JUMP);
+        return true;
+    }
+    return false;
+}
+
+// Registra os colisores do jogador neste quadro: lâmina (AT), corpo e escudo (AC), corpo (OC)
+static void RegisterColliders(Player *p)
+{
+    p->actor.pos = p->pos;
+
+    Vector3 base, tip;
+    unsigned dmg;
+    bool active = BladeSegment(p, &base, &tip, &dmg);
+    if (active)
+    {
+        if (!p->swordActive) p->swordAT.quadFresh = true;   // golpe novo: começa uma varredura nova
+        Collider_SetQuad(&p->swordAT, base, tip);
+        p->swordAT.touchDmg = dmg;
+        CollisionCheck_SetAT(&p->swordAT);
+    }
+    p->swordActive = active;
+
+    p->bodyAC.pos = p->bodyOC.pos = p->pos;
+    if (!Invulnerable(p)) CollisionCheck_SetAC(&p->bodyAC);
+    if (p->state == PSTATE_SHIELD)
+    {
+        // Escudo: um colisor duro na frente do corpo
+        p->shieldAC.pos = Vector3Add(p->pos, (Vector3){ sinf(p->angle)*0.45f, 0.1f, cosf(p->angle)*0.45f });
+        CollisionCheck_SetAC(&p->shieldAC);
+    }
+    CollisionCheck_SetOC(&p->bodyOC);
 }
 
 static void DrawSwordSwing(const Player *p)

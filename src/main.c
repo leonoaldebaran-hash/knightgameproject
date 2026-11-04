@@ -44,22 +44,27 @@ static void UpdateDrawFrame(void)
     float dt = GetFrameTime();
     if (dt > 0.1f) dt = 0.1f;   // evita "teleportes" quando a aba fica em segundo plano
 
+    // Ordem do Ocarina: todos os atores atualizam (lendo as colisões do quadro anterior e
+    // registrando os colisores novos), depois a checagem de colisões roda de uma vez
+    CollisionCheck_Clear();
     Target_Update(&player, &gameCamera.cam, dt);
     Player_Update(&player, gameCamera.yaw, dt);
-    Soldiers_Update(&player, dt);
-    Dummies_Update(dt);
+    Actor_UpdateAll(&player, dt);
+    CollisionCheck_Run();
+    Actor_ApplyDisplacement();
+    Player_AfterCollision(&player);
     GameCamera_Update(&gameCamera, &player, dt);
+
     // Música como no Ocarina: inimigo mais próximo e jogador parado decidem a mistura
     bool playerStill = player.grounded && Vector3Length(player.vel) < 0.01f;
-    Music_Update(Soldiers_NearestDistance(player.pos), playerStill, dt);
+    Music_Update(Actor_NearestHostileDist(player.pos), playerStill, dt);
 
     BeginDrawing();
     ClearBackground((Color){ 120, 170, 220, 255 });
 
     BeginMode3D(gameCamera.cam);
         World_Draw();
-        Dummies_Draw();
-        Soldiers_Draw();
+        Actor_DrawAll();
         Player_Draw(&player);
         Target_Draw();
     EndMode3D();
@@ -97,9 +102,14 @@ int main(void)
     Music_Init();
 
     World_Init();
-    Dummies_Init();
-    Soldiers_Init();
     Player_Init(&player);
+
+    // Atores do campo de teste: bonecos de treino e dois soldados (params = rota de patrulha)
+    Actor_Spawn(&EnDummy_Profile, (Vector3){ -2.0f, 0.0f, -3.0f }, 0.0f, 0);
+    Actor_Spawn(&EnDummy_Profile, (Vector3){  1.0f, 0.0f, -5.0f }, 0.0f, 0);
+    Actor_Spawn(&EnDummy_Profile, (Vector3){ -5.0f, 0.0f, -6.0f }, 0.0f, 0);
+    Actor_Spawn(&EnSoldier_Profile, (Vector3){ 0 }, 0.0f, 0);
+    Actor_Spawn(&EnSoldier_Profile, (Vector3){ 0 }, 0.0f, 1);
     GameCamera_Init(&gameCamera);
 
 #if defined(PLATFORM_WEB)

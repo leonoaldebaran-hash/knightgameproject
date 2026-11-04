@@ -18,6 +18,99 @@
 #define OOT_TURN(s16)   ((s16)/65536.0f*2.0f*PI*OOT_FPS)     // ângulo s16/quadro -> rad/s
 #define OOT_FRAMES(n)   ((n)/OOT_FPS)                        // quadros -> segundos
 
+// ---------------------------------------------------------------------------
+// Atores (actor.c), no modelo do Ocarina: tudo que vive no mundo é um ator, com
+// categoria, marcadores e funções de iniciar/atualizar/desenhar.
+// ---------------------------------------------------------------------------
+typedef enum {
+    ACTORCAT_SWITCH, ACTORCAT_BG, ACTORCAT_PLAYER, ACTORCAT_EXPLOSIVE, ACTORCAT_NPC,
+    ACTORCAT_ENEMY, ACTORCAT_PROP, ACTORCAT_ITEMACTION, ACTORCAT_MISC, ACTORCAT_BOSS,
+    ACTORCAT_DOOR, ACTORCAT_CHEST, ACTORCAT_MAX
+} ActorCategory;
+
+#define ACTOR_FLAG_TARGETABLE (1 << 0)   // pode ser travado com a mira
+#define ACTOR_FLAG_HOSTILE    (1 << 2)   // inimigo (seta amarela, música de combate)
+#define ACTOR_FLAG_FRIENDLY   (1 << 3)
+
+// Tipos de dano: quem bate diz o tipo, e a tabela de cada ator diz quanto tira
+typedef enum { DMG_SLASH, DMG_SPIN, DMG_JUMP, DMG_ENEMY_SWORD, DMG_COUNT } DamageType;
+#define DMG_BIT(t) (1u << (t))
+
+#define MASS_IMMOVABLE 255   // não é empurrado por nada
+#define MASS_HEAVY     254   // só empurra quem é mais leve
+
+typedef struct Actor Actor;
+
+typedef struct ActorProfile {
+    const char *name;
+    ActorCategory category;
+    unsigned flags;
+    int size;                               // tamanho da struct do ator (que começa com Actor)
+    void (*init)(Actor *a);
+    void (*update)(Actor *a, float dt);
+    void (*draw)(Actor *a);
+} ActorProfile;
+
+typedef struct ColChkInfo {
+    int health;
+    unsigned char mass;
+    const unsigned char *damageTable;       // dano por DamageType (NULL = 1 de dano para tudo)
+    Vector3 displacement;                   // empurrão acumulado nas colisões OC do quadro
+} ColChkInfo;
+
+struct Actor {
+    const ActorProfile *profile;
+    ActorCategory category;
+    unsigned flags;
+    Vector3 pos, home;
+    float yaw;
+    Vector3 vel;
+    float xzDistToPlayer, yawTowardsPlayer;
+    float targetHeight;                     // altura do marcador da mira
+    ColChkInfo colChk;
+    bool killed;
+    int params;
+    Actor *next;
+};
+
+// ---------------------------------------------------------------------------
+// Colisores (collision.c), no modelo do Ocarina:
+// AT = ataque, AC = corpo que leva dano, OC = corpos que se empurram.
+// ---------------------------------------------------------------------------
+typedef enum { COLSHAPE_CYLINDER, COLSHAPE_QUAD } ColShape;
+
+#define AT_ON          (1 << 0)
+#define AT_HIT         (1 << 1)   // acertou algo neste quadro
+#define AT_BOUNCED     (1 << 2)   // bateu num colisor duro (escudo) e ricocheteou
+#define AT_TYPE_PLAYER (1 << 3)   // dano do lado do jogador
+#define AT_TYPE_ENEMY  (1 << 4)   // dano do lado dos inimigos
+
+#define AC_ON          (1 << 0)
+#define AC_HIT         (1 << 1)   // levou um golpe neste quadro
+#define AC_HARD        (1 << 2)   // duro: golpes ricocheteiam (escudo)
+#define AC_TYPE_PLAYER (1 << 3)   // leva dano de ataques do jogador
+#define AC_TYPE_ENEMY  (1 << 4)   // leva dano de ataques de inimigos
+#define AC_BOUNCED     (1 << 5)   // fez um golpe ricochetear
+
+#define OC_ON          (1 << 0)
+#define OC_HIT         (1 << 1)
+
+typedef struct Collider {
+    Actor *actor;
+    ColShape shape;
+    unsigned char atFlags, acFlags, ocFlags;
+    unsigned touchDmg;          // AT: tipos de dano que causa
+    int damage;                 // AT: dano base (usado quando quem leva não tem tabela)
+    unsigned bumpDmg;           // AC: tipos de dano que aceita
+    float radius, height;       // cilindro (base em pos)
+    Vector3 pos;
+    Vector3 quad[4];            // quadrilátero: base e ponta agora, base e ponta no quadro anterior
+    bool quadFresh;             // próximo SetQuad começa uma varredura nova
+    Actor *atHit, *acHit;       // resultados do quadro: quem acertou / quem bateu
+    unsigned acHitDmg;          // tipos de dano do golpe recebido
+    int acHitDamage;
+} Collider;
+
 typedef enum PlayerState {
     PSTATE_NORMAL,   // andando livre
     PSTATE_ATTACK,   // golpe de espada em andamento
@@ -32,6 +125,12 @@ typedef enum PlayerState {
 } PlayerState;
 
 typedef struct Player {
+    Actor actor;        // o jogador também é um ator (categoria PLAYER), como no Ocarina
+    Collider swordAT;   // lâmina varrendo o espaço durante o golpe
+    Collider bodyAC;    // corpo que leva dano
+    Collider shieldAC;  // escudo levantado: duro, golpes ricocheteiam
+    Collider bodyOC;    // corpo que empurra e é empurrado
+    bool swordActive;   // a lâmina estava machucando no quadro anterior
     Vector3 pos;
     Vector3 vel;
     float angle;        // direção para onde o jogador olha (radianos)
@@ -100,31 +199,34 @@ void World_Draw(void);
 // Jogador (player.c)
 void Player_Init(Player *p);
 void Player_Update(Player *p, float camYaw, float dt);
+void Player_AfterCollision(Player *p);   // aplica o empurrão das colisões OC
 void Player_Draw(const Player *p);
-typedef enum { HIT_IGNORED, HIT_BLOCKED, HIT_TAKEN } HitResult;
-HitResult Player_TakeHit(Player *p, Vector3 from, int damage);
 
-// Soldados inimigos (soldier.c)
-void Soldiers_Init(void);
-void Soldiers_Update(Player *p, float dt);
-int Soldiers_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId, int damage);
-Vector3 Soldiers_Collide(Vector3 pos, float radius);
-void Soldiers_Draw(void);
+// Atores (actor.c)
+Actor *Actor_Spawn(const ActorProfile *profile, Vector3 pos, float yaw, int params);
+void Actor_Register(Actor *a, ActorCategory category);   // ator que não foi criado por Actor_Spawn (o jogador)
+void Actor_Kill(Actor *a);
+Actor *Actor_First(ActorCategory category);
+void Actor_UpdateAll(const Player *p, float dt);
+void Actor_ApplyDisplacement(void);
+void Actor_DrawAll(void);
+int Actor_ApplyDamage(Actor *a, unsigned dmgFlags, int baseDamage);   // tira vida pela tabela; retorna o dano
+float Actor_NearestHostileDist(Vector3 pos);   // -1 se nenhum
 
-// Bonecos de treino (dummy.c)
-void Dummies_Init(void);
-void Dummies_Update(float dt);
-int Dummies_Hit(Vector3 origin, float angle, float reach, float halfArc, int attackId, int damage);
-Vector3 Dummies_Collide(Vector3 pos, float radius);
-void Dummies_Draw(void);
+// Colisões (collision.c)
+void Collider_InitCylinder(Collider *c, Actor *actor, float radius, float height);
+void Collider_InitQuad(Collider *c, Actor *actor);
+void Collider_SetQuad(Collider *c, Vector3 base, Vector3 tip);
+void CollisionCheck_Clear(void);
+void CollisionCheck_SetAT(Collider *c);
+void CollisionCheck_SetAC(Collider *c);
+void CollisionCheck_SetOC(Collider *c);
+void CollisionCheck_Run(void);
+
+// Atores do jogo
+extern const ActorProfile EnSoldier_Profile;   // soldado de armadura (soldier.c)
+extern const ActorProfile EnDummy_Profile;     // boneco de treino (dummy.c)
 int Dummies_TotalHits(void);
-
-bool Soldiers_Engaged(void);
-float Soldiers_NearestDistance(Vector3 pos);   // inimigo hostil mais próximo; -1 se nenhum
-int Soldiers_Count(void);
-bool Soldiers_TargetPos(int i, Vector3 *pos);
-int Dummies_Count(void);
-bool Dummies_TargetPos(int i, Vector3 *pos);
 
 // Mira travada (target.c)
 void Target_Update(const Player *p, const Camera3D *cam, float dt);

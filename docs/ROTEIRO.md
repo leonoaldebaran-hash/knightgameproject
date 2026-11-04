@@ -30,11 +30,13 @@ O Ocarina roda a lógica a 20 quadros por segundo. As macros `OOT_DIST`, `OOT_SP
 | Bordas e escalada | até 18 sobe andando; 18–41 pulinho; 41–59 escalada baixa; 59–79,4 alta; 79,4–111 pula e agarra; empurrar 3/6 quadros | `player.c`, `world.c` |
 | Golpe com pulo | mira + ação para a frente: impulso 6,0 / 5,8, dano dobrado (giratório também é dobrado) | `player.c` |
 | Câmera | NORMAL (distância elástica 200–300, 10°, FOV 60, gira só andando), PARALELO (250, FOV 45), BATALHA (180, FOV 50) | `camera.c` |
+| Atores | perfil (init/update/draw), categorias (inimigo, objeto, NPC...), marcadores (mirável, hostil), lista por categoria, Actor_Spawn/Kill | `actor.c` |
+| Colisões | AT (ataque), AC (leva dano, AC_HARD = escudo faz ricochetear), OC (empurrão por massa), lâmina como quadrilátero varrido, tabela de dano por ator; checagem depois de todos atualizarem | `collision.c` |
 | Música | tocadores principal e de inimigo, volume pela distância (150–500), modo parado, retomada | `music.c` |
 
 **Ainda falta trazer para o modelo do Ocarina:** ficar pendurado ao cair de costas de uma borda,
-andar para trás com a mira, virada rápida (quando o direcional inverte), colisão por polígonos com tipos de
-superfície, colisores de ataque, dano e empurrão, sistema de atores, cenas e salas, HUD com os botões, fanfarras.
+andar para trás com a mira, virada rápida (quando o direcional inverte), colisão do cenário por polígonos
+com tipos de superfície, cenas e salas, HUD com os botões, fanfarras.
 
 **Assets que o autor gera em outras IAs, quando o Claude pedir:** músicas (Suno, com prompt escrito
 pelo Claude) e imagens, como fundos pré-renderizados (salas internas e lojas, como no Ocarina),
@@ -63,8 +65,10 @@ texturas e artes conceituais.
 | `camera.c` | Câmera em terceira pessoa e câmera de mira travada |
 | `target.c` | Mira travada (Z-target): escolha do alvo, marcador, faixas de cinema |
 | `world.c` | Cenário de teste e colisão (caixas e árvores) |
-| `soldier.c` | Soldado inimigo: patrulha, perseguição, aviso, golpe, brecha, dano |
-| `dummy.c` | Bonecos de treino |
+| `actor.c` | Sistema de atores: perfis, categorias, criar e remover, atualizar e desenhar |
+| `collision.c` | Colisores AT/AC/OC no modelo do Ocarina |
+| `soldier.c` | Ator EnSoldier: patrulha, perseguição, aviso, golpe (lâmina AT), brecha, dano pela tabela (corpo AC) |
+| `dummy.c` | Ator EnDummy: boneco de treino imóvel e mirável |
 | `sfx.c` | Efeitos sonoros e grunhidos de voz sintetizados |
 | `synth.c` | Sequenciador estilo N64: partitura em MML tocada ao vivo com instrumentos gravados, estéreo, reverb e EQ |
 | `songs.c` | As músicas, escritas em MML (sintaxe explicada no topo do arquivo) |
