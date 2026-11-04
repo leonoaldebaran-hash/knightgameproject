@@ -55,11 +55,12 @@ jobs:
           for f in assets/music_src/*.mp3; do
             name=$(basename "$f" .mp3)
             # 32 kHz e agudos suavizados: o som mais "quente" dos cartuchos de N64.
-            # loudnorm deixa todas as faixas no mesmo volume.
+            # loudnorm deixa todas as faixas no mesmo volume. silenceremove corta o silêncio
+            # do começo e do fim (areverse vira o áudio para tirar o do fim), para o loop fechar bem.
             # -vn -map_metadata -1: descarta a capa do álbum embutida no MP3, que viraria
             # um "vídeo" dentro do OGG e impediria o jogo de abrir a música.
             ffmpeg -loglevel error -y -i "$f" -vn -map_metadata -1 \
-              -af "loudnorm=I=-16:TP=-1.5,lowpass=f=12000,aresample=32000" \
+              -af "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,loudnorm=I=-16:TP=-1.5,lowpass=f=12000,aresample=32000" \
               -c:a libvorbis -q:a 3 "public/music/$name.ogg"
           done
           ls -la public/music

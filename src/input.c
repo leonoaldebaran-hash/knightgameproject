@@ -42,6 +42,12 @@ bool Input_Attack(void)
     return IsKeyPressed(KEY_J) || (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT));
 }
 
+// Botão de ataque segurado: carrega o golpe giratório
+bool Input_AttackHeld(void)
+{
+    return IsKeyDown(KEY_J) || (IsGamepadAvailable(0) && IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT));
+}
+
 // Escudo (segurar): K ou R1
 bool Input_Shield(void)
 {

@@ -13,6 +13,9 @@ typedef enum PlayerState {
     PSTATE_SHIELD,   // escudo levantado
     PSTATE_HURT,     // empurrado para trás depois de levar um golpe
     PSTATE_DODGE,    // salto lateral ou mortal para trás (com a mira travada)
+    PSTATE_ROLL,     // rolamento para a frente (sem a mira)
+    PSTATE_CHARGE,   // segurando o botão de ataque: carregando o golpe giratório
+    PSTATE_SPIN,     // golpe giratório
 } PlayerState;
 
 typedef struct Player {
@@ -32,6 +35,9 @@ typedef struct Player {
     float dodgeTimer;   // tempo desde o início da esquiva
     bool dodgeBack;     // esquiva para trás (mortal) ou para o lado
     float dodgeSide;    // -1 esquerda, +1 direita (só no salto lateral)
+    float rollTimer;    // tempo desde o início do rolamento
+    float chargeTime;   // tempo carregando o golpe giratório
+    float spinTimer;    // tempo desde o início do golpe giratório
 } Player;
 
 typedef struct GameCamera {
@@ -55,6 +61,7 @@ bool Input_Target(void);
 bool Input_TargetPressed(void);
 bool Input_Dodge(void);
 bool Input_Attack(void);
+bool Input_AttackHeld(void);
 bool Input_Shield(void);
 
 // Mundo (world.c)
@@ -97,8 +104,10 @@ Vector3 Target_Pos(void);
 void Target_Draw(void);
 float Target_BarAmount(void);   // 0 a 1: faixas pretas de cinema na tela
 
-// Música (music.c)
+// Música (music.c): uma faixa por lugar, mais a de combate
+typedef enum { TRACK_FIELD, TRACK_BATTLE, TRACK_COUNT } TrackId;
 void Music_Init(void);
+void Music_SetArea(TrackId track);
 void Music_Update(bool inBattle, float dt);
 
 // Sequenciador no estilo N64 tocando orquestra gravada (synth.c).

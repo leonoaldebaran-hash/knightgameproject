@@ -70,10 +70,10 @@ static void UpdateDrawFrame(void)
         DrawRectangle(0, SCREEN_H - bar, SCREEN_W, bar, BLACK);
     }
 
-    DrawText("Knight Game Project - Tarefa 6", 10, 10, 20, RAYWHITE);
-    DrawText("Musica: M ou Select liga/desliga", SCREEN_W - 190, 34, 10, RAYWHITE);
+    DrawText("Knight Game Project - Tarefa 7", 10, 10, 20, RAYWHITE);
     DrawText("Andar: setas/WASD ou analogico | Camera: Q/E ou analogico direito | Mira: segure C ou L1", 10, 34, 10, RAYWHITE);
-    DrawText("Espada: J ou B | Escudo: segure K ou R1 | Com a mira: Espaco ou A + lado = salto, + tras = mortal", 10, 48, 10, RAYWHITE);
+    DrawText("Espada: J ou B (segure e solte = giratorio) | Escudo: K ou R1 | Espaco ou A: rolar / com a mira: saltar", 10, 48, 10, RAYWHITE);
+    DrawText("Musica: M ou Select", SCREEN_W - 110, SCREEN_H - 34, 10, RAYWHITE);
     DrawText(TextFormat("Acertos: %d", Dummies_TotalHits()), SCREEN_W - 110, 10, 20, RAYWHITE);
     DrawHearts(player.hp, player.maxHp, 24.0f, 74.0f);
 

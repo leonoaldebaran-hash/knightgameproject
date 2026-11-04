@@ -61,6 +61,8 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 | Mira travada (segurar) / centralizar câmera | C | L1 |
 | Espada (combo de 3, cancelável) | J | B |
 | Escudo (segurar) | K | R1 |
+| Golpe giratório | Segure J e solte quando brilhar | Segure B e solte |
+| Rolar (sem a mira) | Espaço + direção | A + direção |
 | Salto lateral / mortal (com a mira) | Espaço + direção | A + direção |
 | Ligar/desligar música | M | Select |
 
@@ -72,10 +74,11 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 - [x] Tarefa 5: soldado inimigo com IA, vida em corações, escudo defendendo
 - [x] Tarefa 6: mira travada, andar em volta do alvo, salto lateral e mortal para trás
 - [x] Som: grunhidos e efeitos; trilha com as músicas do autor (After Future no campo, Paganini Fist no combate)
+      com loop suave (duas cópias se cruzando) e silêncio do começo e do fim cortado
+- [x] Tarefa 7: rolamento e golpe giratório carregado
 
 ## Próximas tarefas
 **Fase 2: terminar o combate**
-- [ ] 7: rolamento e golpe giratório carregado
 - [ ] 8: pulo automático nas bordas, alturas e plataformas
 - [ ] 9: arqueiro e cavaleiro pesado com escudo
 

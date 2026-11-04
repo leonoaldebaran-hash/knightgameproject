@@ -27,6 +27,15 @@
 #define BACKFLIP_SPEED 7.5f
 #define BACKFLIP_HIGH 1.0f
 
+#define ROLL_TIME     0.45f   // duração do rolamento
+#define ROLL_SPEED    9.0f
+#define ROLL_SAFE     0.30f   // começo do rolamento em que o jogador não leva dano
+
+#define CHARGE_TIME   0.7f    // segurando o ataque esse tempo, o golpe giratório fica pronto
+#define CHARGE_SPEED  1.8f    // dá para andar devagar enquanto carrega
+#define SPIN_TIME     0.40f   // duração do golpe giratório
+#define SPIN_REACH    2.3f    // alcance em volta do jogador
+
 static const Vector3 spawnPos = { 0.0f, 0.0f, 6.0f };
 
 typedef struct AttackInfo {
@@ -56,6 +65,7 @@ HitResult Player_TakeHit(Player *p, Vector3 from, int damage)
 {
     // Durante a esquiva o jogador não leva dano: é o momento de escapar do golpe
     if (p->invulnTimer > 0.0f || p->state == PSTATE_HURT || p->state == PSTATE_DODGE) return HIT_IGNORED;
+    if (p->state == PSTATE_ROLL && p->rollTimer < ROLL_SAFE) return HIT_IGNORED;
 
     float dx = from.x - p->pos.x, dz = from.z - p->pos.z;
     float toAttacker = atan2f(dx, dz);
@@ -236,6 +246,74 @@ static void UpdateAttack(Player *p, Vector3 wishDir, bool attackPressed, bool sh
         if (hits > 0) Sfx_Play(SFX_HIT);
     }
 
+    // Golpe terminou com o botão ainda segurado: começa a carregar o golpe giratório
+    if (t >= 1.0f)
+    {
+        p->state = Input_AttackHeld() ? PSTATE_CHARGE : PSTATE_NORMAL;
+        p->chargeTime = 0.0f;
+    }
+}
+
+// Rolamento: corre e rola para onde o direcional aponta
+static void StartRoll(Player *p, Vector3 wishDir)
+{
+    p->angle = atan2f(wishDir.x, wishDir.z);
+    p->state = PSTATE_ROLL;
+    p->rollTimer = 0.0f;
+    Sfx_Play(SFX_SWING);
+}
+
+static void UpdateRoll(Player *p, float dt)
+{
+    p->rollTimer += dt;
+    float t = fminf(p->rollTimer/ROLL_TIME, 1.0f);
+    Vector3 facing = { sinf(p->angle), 0.0f, cosf(p->angle) };
+    p->vel = Vector3Scale(facing, ROLL_SPEED*(1.0f - 0.4f*t));
+    if (t >= 1.0f)
+    {
+        p->vel = Vector3Scale(p->vel, 0.5f);
+        p->state = PSTATE_NORMAL;
+    }
+}
+
+// Carregando: anda devagar com a espada para trás; soltar com a carga cheia gira
+static void UpdateCharge(Player *p, Vector3 wishDir, bool shieldHeld, float dt)
+{
+    bool wasReady = p->chargeTime >= CHARGE_TIME;
+    p->chargeTime += dt;
+    if (!wasReady && p->chargeTime >= CHARGE_TIME) Sfx_Play(SFX_ALERT);   // "tim": está pronto
+
+    p->vel = Vector3MoveTowards(p->vel, Vector3Scale(wishDir, CHARGE_SPEED), ACCEL*dt);
+    if (Target_Active()) TurnTowards(p, AngleToTarget(p), LOCK_TURN, dt);
+
+    if (shieldHeld) p->state = PSTATE_SHIELD;
+    else if (!Input_AttackHeld())
+    {
+        if (p->chargeTime >= CHARGE_TIME)
+        {
+            p->state = PSTATE_SPIN;
+            p->spinTimer = 0.0f;
+            p->attackId++;
+            Sfx_Play(SFX_SWING);
+            Sfx_Play(SFX_VOICE_ATTACK);
+        }
+        else p->state = PSTATE_NORMAL;
+    }
+}
+
+// Golpe giratório: acerta tudo em volta
+static void UpdateSpin(Player *p, float dt)
+{
+    p->spinTimer += dt;
+    float t = p->spinTimer/SPIN_TIME;
+    p->vel = Vector3MoveTowards(p->vel, Vector3Zero(), DECEL*dt);
+
+    if (t >= 0.1f && t <= 0.9f)
+    {
+        int hits = Dummies_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId)
+                 + Soldiers_Hit(p->pos, p->angle, SPIN_REACH, PI, p->attackId);
+        if (hits > 0) Sfx_Play(SFX_HIT);
+    }
     if (t >= 1.0f) p->state = PSTATE_NORMAL;
 }
 
@@ -264,12 +342,25 @@ void Player_Update(Player *p, float camYaw, float dt)
             if (attackPressed) StartAttack(p, 0, wishDir);
             else if (shieldHeld) p->state = PSTATE_SHIELD;
             else if (Target_Active() && dodgePressed && TryDodge(p, wishDir)) break;
+            else if (!Target_Active() && dodgePressed && Vector3Length(wishDir) > 0.3f) StartRoll(p, wishDir);
             else if (Target_Active()) UpdateLocked(p, wishDir, dt);
             else UpdateNormal(p, wishDir, dt);
             break;
 
         case PSTATE_DODGE:
             UpdateDodge(p, dt);
+            break;
+
+        case PSTATE_ROLL:
+            UpdateRoll(p, dt);
+            break;
+
+        case PSTATE_CHARGE:
+            UpdateCharge(p, wishDir, shieldHeld, dt);
+            break;
+
+        case PSTATE_SPIN:
+            UpdateSpin(p, dt);
             break;
 
         case PSTATE_ATTACK:
@@ -359,6 +450,33 @@ void Player_Draw(const Player *p)
             rlTranslatef(0.0f, -0.7f, 0.0f);
         }
 
+        // Rolamento: cambalhota para a frente, bem rente ao chão
+        if (p->state == PSTATE_ROLL)
+        {
+            float t = fminf(p->rollTimer/ROLL_TIME, 1.0f);
+            rlTranslatef(0.0f, 0.45f, 0.0f);
+            rlRotatef(360.0f*t, 1.0f, 0.0f, 0.0f);
+            rlTranslatef(0.0f, -0.45f, 0.0f);
+        }
+
+        // Golpe giratório: o corpo inteiro dá uma volta, com um anel de rastro da lâmina
+        if (p->state == PSTATE_SPIN)
+        {
+            float t = fminf(p->spinTimer/SPIN_TIME, 1.0f);
+            float turn = 360.0f*(1.0f - (1.0f - t)*(1.0f - t));
+            for (int i = 0; i < 16; i++)
+            {
+                float a0 = (float)i/16.0f*turn*DEG2RAD, a1 = (float)(i + 1)/16.0f*turn*DEG2RAD;
+                Vector3 o = { 0.0f, 0.8f, 0.0f };
+                Vector3 v0 = { -cosf(a0)*SPIN_REACH, 0.8f, sinf(a0)*SPIN_REACH };
+                Vector3 v1 = { -cosf(a1)*SPIN_REACH, 0.8f, sinf(a1)*SPIN_REACH };
+                Color trail = Fade((Color){ 255, 240, 160, 255 }, 0.4f*(1.0f - t));
+                DrawTriangle3D(o, v0, v1, trail);
+                DrawTriangle3D(o, v1, v0, trail);
+            }
+            rlRotatef(turn, 0.0f, 1.0f, 0.0f);
+        }
+
         DrawCube((Vector3){ 0.0f, 0.6f, 0.0f }, 0.6f, 1.2f, 0.4f, body);                         // corpo
         DrawSphere((Vector3){ 0.0f, 1.45f, 0.0f }, 0.3f, (Color){ 240, 200, 90, 255 });         // cabeça loira
 
@@ -366,8 +484,29 @@ void Player_Draw(const Player *p)
         if (p->state == PSTATE_SHIELD) DrawCube((Vector3){ 0.1f, 0.8f, 0.45f }, 0.6f, 0.7f, 0.1f, shield);
         else DrawCube((Vector3){ 0.4f, 0.7f, 0.1f }, 0.1f, 0.6f, 0.5f, shield);
 
-        // Espada: animada durante o golpe, apontando para a frente no braço direito no resto do tempo
+        // Espada: animada durante o golpe; para trás e brilhando enquanto carrega; esticada para
+        // o lado no giro; apontando para a frente no braço direito no resto do tempo
         if (p->state == PSTATE_ATTACK) DrawSwordSwing(p);
+        else if (p->state == PSTATE_CHARGE)
+        {
+            bool ready = p->chargeTime >= CHARGE_TIME;
+            Color blade = ready ? ((fmodf(p->chargeTime, 0.16f) < 0.08f) ? YELLOW : WHITE)
+                                : ColorLerp(WHITE, (Color){ 120, 200, 255, 255 }, p->chargeTime/CHARGE_TIME);
+            rlPushMatrix();
+                rlTranslatef(-0.35f, 0.9f, 0.0f);
+                rlRotatef(-140.0f, 0.0f, 1.0f, 0.0f);
+                DrawCube((Vector3){ 0.0f, 0.0f, 0.6f }, 0.06f, 0.06f, 1.0f, blade);
+                if (ready) DrawSphere((Vector3){ 0.0f, 0.0f, 1.1f }, 0.12f, Fade(YELLOW, 0.7f));
+            rlPopMatrix();
+        }
+        else if (p->state == PSTATE_SPIN)
+        {
+            rlPushMatrix();
+                rlTranslatef(-0.35f, 0.8f, 0.0f);
+                rlRotatef(-90.0f, 0.0f, 1.0f, 0.0f);
+                DrawCube((Vector3){ 0.0f, 0.0f, 0.9f }, 0.06f, 0.06f, 1.3f, (Color){ 255, 240, 160, 255 });
+            rlPopMatrix();
+        }
         else DrawCube((Vector3){ -0.4f, 0.7f, 0.5f }, 0.06f, 0.06f, 0.9f, WHITE);
     rlPopMatrix();
 }
