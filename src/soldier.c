@@ -227,7 +227,20 @@ bool Soldiers_TargetPos(int i, Vector3 *pos)
     return true;
 }
 
-// Algum soldado está lutando com o jogador? (usado para trocar a música)
+// Distância até o soldado em pé mais próximo (decide o volume da música de inimigo)
+float Soldiers_NearestDistance(Vector3 pos)
+{
+    float best = -1.0f;
+    for (int i = 0; i < MAX_SOLDIERS; i++)
+    {
+        if (soldiers[i].state == SOLDIER_DEAD) continue;
+        float d = Vector3Distance(pos, soldiers[i].pos);
+        if (best < 0.0f || d < best) best = d;
+    }
+    return best;
+}
+
+// Algum soldado está lutando com o jogador?
 bool Soldiers_Engaged(void)
 {
     for (int i = 0; i < MAX_SOLDIERS; i++)

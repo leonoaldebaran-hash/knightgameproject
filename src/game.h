@@ -97,6 +97,7 @@ void Dummies_Draw(void);
 int Dummies_TotalHits(void);
 
 bool Soldiers_Engaged(void);
+float Soldiers_NearestDistance(Vector3 pos);   // inimigo hostil mais próximo; -1 se nenhum
 int Soldiers_Count(void);
 bool Soldiers_TargetPos(int i, Vector3 *pos);
 int Dummies_Count(void);
@@ -113,7 +114,7 @@ float Target_BarAmount(void);   // 0 a 1: faixas pretas de cinema na tela
 typedef enum { TRACK_FIELD, TRACK_BATTLE, TRACK_COUNT } TrackId;
 void Music_Init(void);
 void Music_SetArea(TrackId track);
-void Music_Update(bool inBattle, float dt);
+void Music_Update(float enemyDist, bool playerStill, float dt);   // enemyDist < 0 = nenhum inimigo
 
 // Sequenciador no estilo N64 tocando orquestra gravada (synth.c).
 // A ordem dos instrumentos do banco é a mesma de tools/build_soundbank.py.

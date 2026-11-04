@@ -9,12 +9,27 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 - Instrumentos gravados da trilha: [SOUNDBANK.md](SOUNDBANK.md)
 - Medições das músicas do autor: [MUSICA_ANALISE.md](MUSICA_ANALISE.md) · transcrições em [transcricao/](transcricao/)
 
+## Diretriz principal (decisão do autor)
+**A história, o mundo, os personagens e a arte são originais. Toda a parte técnica segue o Ocarina of
+Time, estudado no código do Ship of Harkinian** (https://github.com/HarbourMasters/Shipwright):
+movimento, câmera, combate, mira, colisão, atores, cenas e salas, áudio, HUD, save, cutscenes e o
+jeito de construir dungeons. Antes de implementar um sistema, o Claude lê como o Ship of Harkinian faz
+e reproduz a **técnica e o comportamento** com código próprio. **Nunca copia código nem assets**:
+o código do Ship of Harkinian vem da decompilação de um jogo da Nintendo.
+
+Escala: o Link tem ~50 unidades de altura no Ocarina e o Mateo ~1,5, então 1 unidade do Ocarina
+≈ 0,03 no nosso mundo (500 unidades ≈ 15).
+
+**Assets que o autor gera em outras IAs, quando o Claude pedir:** músicas (Suno, com prompt escrito
+pelo Claude) e imagens, como fundos pré-renderizados (salas internas e lojas, como no Ocarina),
+texturas e artes conceituais.
+
 ## Como trabalhamos
 1. O Claude implementa cada tarefa e faz commit e push direto na branch `main`.
 2. O GitHub Actions compila e publica o jogo em **https://leonoaldebaran-hash.github.io/knightgameproject/**
-3. O autor testa no navegador (**Ctrl + F5**; confira o número da versão no canto inferior direito) e pede ajustes.
-4. Nada precisa ser instalado no PC do autor. Antes de entregar, o Claude espera o deploy e confere a página,
-   e **fecha o navegador interno** depois de testar, porque o jogo toca música.
+3. O autor testa no navegador (confira o número da versão no canto inferior direito) e pede ajustes.
+4. Nada precisa ser instalado no PC do autor. O Claude espera o deploy e avisa; o autor abre o jogo
+   para testar. Se o Claude abrir o jogo no navegador interno, **fecha a aba depois**, porque o jogo toca música.
 5. O R36S só será testado perto do fim. O build para o R36S já funciona e está guardado na branch `r36s-port`.
 
 ## Tecnologia
@@ -45,7 +60,12 @@ a seguir** e **onde está cada coisa**. Mantenha-o atualizado ao fim de cada tar
 - **Precisa de música nova?** O Claude escreve o **prompt para o Suno** (clima, instrumentos, andamento,
   tom, referências), o autor gera a faixa e manda o arquivo, e o Claude a coloca no jogo.
 - Distribuição das faixas pelos lugares: tabela na seção "Trilha sonora" do [GDD](GDD.md).
-- `src/music.c` toca a faixa do lugar e troca para a de combate (com fade) quando um inimigo persegue o jogador.
+- `src/music.c` segue a lógica do Ocarina: dois tocadores (lugar + inimigo) tocando juntos; o volume da
+  música de inimigo depende da distância do inimigo hostil mais próximo (4,5 a 15 = 150 a 500 unidades do
+  Ocarina), e a do lugar no inverso; a de inimigo sempre começa do início; modo parado abaixa a música do
+  lugar; cada faixa continua de onde parou; loop suave cruzando duas cópias.
+- Ainda falta, no mesmo modelo: **fanfarras** (item obtido, segredo) num terceiro tocador com as outras em
+  silêncio, e **ambiência de natureza à noite** no lugar da música.
 - Padrão pedido pelo autor: épico, cinematográfico e progressivo (Zelda, Nightwish), grave forte,
   nada de som genérico de videogame, nada de caixa estridente.
 - Tentativa descartada: compor nota a nota no motor sequenciado (`src/synth.c`, `src/songs.c`,

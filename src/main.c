@@ -49,7 +49,9 @@ static void UpdateDrawFrame(void)
     Soldiers_Update(&player, dt);
     Dummies_Update(dt);
     GameCamera_Update(&gameCamera, &player, dt);
-    Music_Update(Soldiers_Engaged(), dt);
+    // Música como no Ocarina: inimigo mais próximo e jogador parado decidem a mistura
+    bool playerStill = player.grounded && Vector3Length(player.vel) < 0.01f;
+    Music_Update(Soldiers_NearestDistance(player.pos), playerStill, dt);
 
     BeginDrawing();
     ClearBackground((Color){ 120, 170, 220, 255 });
