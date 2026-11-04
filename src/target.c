@@ -1,5 +1,6 @@
 #include "game.h"
 #include "rlgl.h"
+#include <stddef.h>
 
 #define TARGET_RANGE   10.0f   // distância máxima para travar a mira
 #define LOSE_RANGE     14.0f   // distância em que a mira solta sozinha
